@@ -1,8 +1,20 @@
+/* ─── Design tokens ───────────────────────────────────────────────────────── */
+:root {
+  --amber:       #fdb618;
+  --amber-dark:  #d4960e;
+  --error:       #ed1c24;
+  --teal-deep:   #011c24;
+  --card-bg:     rgba(255, 255, 255, 0.60);
+  --card-border: 3px solid var(--amber);
+  --card-radius: 4px;
+}
+
+/* ─── Full-screen shell ───────────────────────────────────────────────────── */
 .root {
   position: fixed;
   inset: 0;
-  overflow: hidden;
-  background: #011c24;
+  overflow-y: auto;
+  background: var(--teal-deep);
 }
 
 .bgCanvas {
@@ -10,13 +22,276 @@
   inset: 0;
   display: block;
   filter: blur(90px);
+  pointer-events: none;
 }
 
-.canvas {
+.grainCanvas {
   position: fixed;
   inset: 0;
   display: block;
   mix-blend-mode: screen;
+  pointer-events: none;
+}
+
+/* ─── Layout column ───────────────────────────────────────────────────────── */
+.layout {
+  position: relative;
+  z-index: 1;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  padding: 3rem 1.5rem 2rem;
+  gap: 2rem;
+}
+
+/* ─── Logo lockup ─────────────────────────────────────────────────────────── */
+.header {
+  text-align: center;
+}
+
+.wordmark {
+  font-family: var(--font-geist-mono, monospace);
+  font-size: clamp(2.5rem, 8vw, 5rem);
+  font-weight: 700;
+  letter-spacing: 0.25em;
+  color: #fff;
+  margin: 0;
+  line-height: 1;
+  text-shadow: 0 2px 24px rgba(0, 0, 0, 0.4);
+}
+
+.tagline {
+  font-family: var(--font-geist-sans, sans-serif);
+  font-size: clamp(0.7rem, 2vw, 0.875rem);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.65);
+  margin: 0.5rem 0 0;
+}
+
+/* ─── Intake section ──────────────────────────────────────────────────────── */
+.intake {
+  width: 100%;
+  max-width: 520px;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0;
+}
+
+/* ─── Card ────────────────────────────────────────────────────────────────── */
+.card {
+  background: var(--card-bg);
+  border: var(--card-border);
+  border-radius: var(--card-radius);
+  padding: 1.5rem 1.25rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  min-height: 90px;
+  justify-content: center;
+}
+
+.card:hover {
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.cardUrl {
+  cursor: default;
+}
+
+.cardDragging {
+  background: rgba(253, 182, 24, 0.18);
+  border-color: var(--amber);
+}
+
+.cardFilled {
+  background: rgba(255, 255, 255, 0.75);
+}
+
+.cardError {
+  border-color: var(--error) !important;
+}
+
+.cardLabel {
+  font-family: var(--font-geist-sans, sans-serif);
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #1a1a1a;
+  letter-spacing: 0.02em;
+}
+
+.cardSub {
+  font-family: var(--font-geist-mono, monospace);
+  font-size: 0.75rem;
+  color: #555;
+  letter-spacing: 0.1em;
+}
+
+.fileName {
+  font-family: var(--font-geist-mono, monospace);
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #111;
+  word-break: break-all;
+  text-align: center;
+}
+
+/* ─── URL input ───────────────────────────────────────────────────────────── */
+.urlInput {
+  width: 100%;
+  background: transparent;
+  border: none;
+  outline: none;
+  font-family: var(--font-geist-sans, sans-serif);
+  font-size: 0.9rem;
+  color: #111;
+  text-align: center;
+}
+
+.urlInput::placeholder {
+  color: #888;
+}
+
+.urlBadge {
+  font-family: var(--font-geist-mono, monospace);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--amber-dark);
+  background: rgba(253, 182, 24, 0.15);
+  border: 1px solid var(--amber);
+  border-radius: 2px;
+  padding: 0.15rem 0.5rem;
+}
+
+/* ─── Error message ───────────────────────────────────────────────────────── */
+.errorMsg {
+  font-family: var(--font-geist-sans, sans-serif);
+  font-size: 0.75rem;
+  color: var(--error);
+  text-align: center;
+}
+
+/* ─── Divider ─────────────────────────────────────────────────────────────── */
+.divider {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 0;
+  color: rgba(255, 255, 255, 0.5);
+  font-family: var(--font-geist-mono, monospace);
+  font-size: 0.8rem;
+  letter-spacing: 0.1em;
+}
+
+.divider::before,
+.divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: rgba(255, 255, 255, 0.2);
+}
+
+/* ─── CTA button ──────────────────────────────────────────────────────────── */
+.cta {
+  margin-top: 1.25rem;
+  background: var(--amber);
+  color: #111;
+  border: none;
+  border-radius: var(--card-radius);
+  font-family: var(--font-geist-mono, monospace);
+  font-size: 0.9rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  padding: 0.875rem 1.5rem;
+  cursor: pointer;
+  transition: background 0.15s, opacity 0.15s;
+  width: 100%;
+}
+
+.cta:hover:not(:disabled) {
+  background: var(--amber-dark);
+}
+
+.cta:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+/* ─── Footer ──────────────────────────────────────────────────────────────── */
+.footer {
+  width: 100%;
+  max-width: 520px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  text-align: center;
+}
+
+.footerTop {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.version {
+  font-family: var(--font-geist-mono, monospace);
+  font-size: 0.7rem;
+  color: rgba(255, 255, 255, 0.4);
+  letter-spacing: 0.1em;
+  white-space: nowrap;
+}
+
+.disclaimer {
+  font-family: var(--font-geist-sans, sans-serif);
+  font-size: 0.7rem;
+  color: rgba(255, 255, 255, 0.45);
+  line-height: 1.5;
+}
+
+.sources {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 0.25rem 0.75rem;
+}
+
+.sourcesLabel {
+  font-family: var(--font-geist-mono, monospace);
+  font-size: 0.65rem;
+  color: rgba(255, 255, 255, 0.35);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.sourceLink {
+  font-family: var(--font-geist-sans, sans-serif);
+  font-size: 0.65rem;
+  color: rgba(255, 255, 255, 0.4);
+  text-decoration: none;
+  transition: color 0.15s;
+}
+
+.sourceLink:hover {
+  color: var(--amber);
+}
+
+/* ─── Misc ────────────────────────────────────────────────────────────────── */
+.hidden {
+  display: none;
 }
 
 .orientBtn {
@@ -34,4 +309,5 @@
   letter-spacing: 0.08em;
   cursor: pointer;
   backdrop-filter: blur(8px);
+  z-index: 10;
 }
