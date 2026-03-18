@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect, useCallback } from 'react'
+import Image from 'next/image'
 import styles from './results.module.css'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -283,37 +284,60 @@ export default function ResultsPage() {
       <canvas ref={bgRef}    className={styles.bgCanvas} />
       <canvas ref={grainRef} className={styles.grainCanvas} />
 
+      {/* ── Notch ── */}
+      <div className={styles.notch}>
+        <div className={styles.halWrapper}>
+          <span className={styles.halLight} />
+          <button className={styles.halBtn} aria-label="HAL 9000" tabIndex={-1} />
+        </div>
+        <div className={styles.halBubble}>
+          &ldquo;No 9000 computer has ever made a mistake or distorted information.&rdquo;
+        </div>
+        <div className={styles.notchText}>
+          <a
+            href="https://www.strava.com/routes/123456"
+            target="_blank"
+            rel="noopener noreferrer"
+            className={styles.notchRoute}
+          >
+            Breakfast Climb Loop ↗
+          </a>
+          {editingDate ? (
+            <input
+              type="date"
+              className={styles.notchDateInput}
+              value={rideDate}
+              autoFocus
+              onChange={e => setRideDate(e.target.value)}
+              onBlur={() => { sessionStorage.setItem('recon_ride_date', rideDate); setEditingDate(false) }}
+              onKeyDown={e => e.key === 'Enter' && (e.currentTarget.blur())}
+            />
+          ) : (
+            <span className={styles.notchDate} onClick={() => setEditingDate(true)}>
+              Proposed Date: {formatRideDate(rideDate)}
+              <span className={styles.dateEditIcon}>✎</span>
+            </span>
+          )}
+        </div>
+      </div>
+
       <div className={styles.layout}>
 
         {/* ── Header ── */}
         <header className={styles.header}>
           <div className={styles.headerLeft}>
-            <span className={styles.wordmark}>R.E.C.O.N.</span>
-            <a
-              href="https://www.strava.com/routes/123456"
-              target="_blank"
-              rel="noopener noreferrer"
-              className={styles.routeName}
-            >
-              Breakfast Climb Loop ↗
-            </a>
-            {editingDate ? (
-              <input
-                type="date"
-                className={styles.dateEditInput}
-                value={rideDate}
-                autoFocus
-                onChange={e => setRideDate(e.target.value)}
-                onBlur={() => { sessionStorage.setItem('recon_ride_date', rideDate); setEditingDate(false) }}
-                onKeyDown={e => e.key === 'Enter' && (e.currentTarget.blur())}
+            <a href="/">
+              <Image
+                src="/recon-logo.png"
+                alt="R.E.C.O.N."
+                width={160}
+                height={60}
+                priority
+                className={styles.logoImg}
               />
-            ) : (
-              <span className={styles.dateDisplay} onClick={() => setEditingDate(true)}>
-                Date: {formatRideDate(rideDate)}
-                <span className={styles.dateEditIcon}>✎</span>
-              </span>
-            )}
+            </a>
           </div>
+          <div className={styles.headerCenter} />
           <div className={styles.headerRight}>
             <button
               className={styles.unitToggle}
@@ -369,16 +393,8 @@ export default function ResultsPage() {
             <span className={styles.statLabel}>Est. Ride Time</span>
             <span className={styles.statValue}>3h 45m</span>
           </div>
-          <div className={[styles.statCard, styles.surfaceStatCard].join(' ')}>
-            <span className={styles.statLabel}>Surface Breakdown</span>
-            <div className={styles.surfaceBar}>
-              <div className={styles.segPavement} style={{ width: `${MOCK_SURFACE_PCT.pavement}%` }} title={`Paved ${MOCK_SURFACE_PCT.pavement}%`} />
-              <div className={styles.segNonPaved} style={{ width: `${MOCK_SURFACE_PCT.nonPaved}%` }} title={`Off-road ${MOCK_SURFACE_PCT.nonPaved}%`} />
-            </div>
-            <div className={styles.surfaceLegend}>
-              <span className={styles.legendItem}><span className={[styles.dot, styles.dotPavement].join(' ')} />{MOCK_SURFACE_PCT.pavement}% paved</span>
-              <span className={styles.legendItem}><span className={[styles.dot, styles.dotNonPaved].join(' ')} />{MOCK_SURFACE_PCT.nonPaved}% off-road (gravel / dirt)</span>
-            </div>
+          <div className={styles.statCard}>
+            <span className={styles.statLabel}>FPO</span>
           </div>
         </div>
 
@@ -411,8 +427,8 @@ export default function ResultsPage() {
               ))}
               {/* Vertical stripe fill for off-road sections */}
               <pattern id="offroad-fill" patternUnits="userSpaceOnUse" width="8" height="8">
-                <rect width="8" height="8" fill="rgba(253,182,24,0.12)" />
-                <line x1="0" y1="0" x2="0" y2="8" stroke="#fdb618" strokeWidth="2" opacity="0.45" />
+                <rect width="8" height="8" fill="rgba(1,106,125,0.12)" />
+                <line x1="0" y1="0" x2="0" y2="8" stroke="#016a7d" strokeWidth="2" opacity="0.45" />
               </pattern>
             </defs>
 
@@ -433,7 +449,7 @@ export default function ResultsPage() {
               if (!aPath) return null
               return (
                 <path key={`fill-${i}`} d={aPath}
-                  fill={isPaved ? 'rgba(253,182,24,0.30)' : 'url(#offroad-fill)'}
+                  fill={isPaved ? 'rgba(1,106,125,0.30)' : 'url(#offroad-fill)'}
                 />
               )
             })}
@@ -445,7 +461,7 @@ export default function ResultsPage() {
               ).join(' ')
               return (
                 <path key={`stroke-${i}`} d={d}
-                  stroke="#fdb618" strokeWidth="3" fill="none"
+                  stroke="#016a7d" strokeWidth="3" fill="none"
                   strokeLinecap="round" strokeLinejoin="round"
                   strokeDasharray={SURFACE_DASH[seg.surface]}
                 />
@@ -469,23 +485,36 @@ export default function ResultsPage() {
             })}
           </svg>
 
-          {/* Legend */}
-          <div className={styles.elevLegend}>
-            <span className={styles.legendItem}>
-              <svg width="28" height="5"><line x1="0" y1="2.5" x2="28" y2="2.5" stroke="#fdb618" strokeWidth="3" /></svg>
-              Pavement
-            </span>
-            <span className={styles.legendItem}>
-              <svg width="28" height="5"><line x1="0" y1="2.5" x2="28" y2="2.5" stroke="#fdb618" strokeWidth="3" strokeDasharray="8 5" /></svg>
-              Off-road
-            </span>
-            <span className={styles.legendDivider} />
-            {Object.entries(POI_COLOR).map(([type, col]) => (
-              <span key={type} className={styles.legendItem}>
-                <span className={styles.legendDot} style={{ background: col }} />
-                {type.charAt(0).toUpperCase() + type.slice(1)}
+          {/* Legend + Surface Breakdown */}
+          <div className={styles.elevFooter}>
+            <div className={styles.elevLegend}>
+              <span className={styles.legendItem}>
+                <svg width="28" height="5"><line x1="0" y1="2.5" x2="28" y2="2.5" stroke="#016a7d" strokeWidth="3" /></svg>
+                Pavement
               </span>
-            ))}
+              <span className={styles.legendItem}>
+                <svg width="28" height="5"><line x1="0" y1="2.5" x2="28" y2="2.5" stroke="#016a7d" strokeWidth="3" strokeDasharray="8 5" /></svg>
+                Off-road
+              </span>
+              <span className={styles.legendDivider} />
+              {Object.entries(POI_COLOR).map(([type, col]) => (
+                <span key={type} className={styles.legendItem}>
+                  <span className={styles.legendDot} style={{ background: col }} />
+                  {type.charAt(0).toUpperCase() + type.slice(1)}
+                </span>
+              ))}
+            </div>
+            <div className={styles.surfaceInset}>
+              <span className={styles.statLabel}>Surface Breakdown</span>
+              <div className={styles.surfaceBar}>
+                <div className={styles.segPavement} style={{ width: `${MOCK_SURFACE_PCT.pavement}%` }} title={`Paved ${MOCK_SURFACE_PCT.pavement}%`} />
+                <div className={styles.segNonPaved} style={{ width: `${MOCK_SURFACE_PCT.nonPaved}%` }} title={`Off-road ${MOCK_SURFACE_PCT.nonPaved}%`} />
+              </div>
+              <div className={styles.surfaceLegend}>
+                <span className={styles.legendItem}><span className={[styles.dot, styles.dotPavement].join(' ')} />{MOCK_SURFACE_PCT.pavement}% paved</span>
+                <span className={styles.legendItem}><span className={[styles.dot, styles.dotNonPaved].join(' ')} />{MOCK_SURFACE_PCT.nonPaved}% off-road</span>
+              </div>
+            </div>
           </div>
         </section>
 

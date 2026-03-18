@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
+import Image from 'next/image'
 import styles from './page.module.css'
 
 // ─── Mesh gradient ───────────────────────────────────────────────────────────
@@ -254,7 +255,14 @@ export default function ReconPage() {
 
         {/* Logo lockup */}
         <header className={styles.header}>
-          <h1 className={styles.wordmark}>R.E.C.O.N.</h1>
+          <Image
+            src="/recon-logo.png"
+            alt="R.E.C.O.N."
+            width={320}
+            height={120}
+            priority
+            className={styles.logoImg}
+          />
           <p className={styles.tagline}>Route Environment &amp; Condition Observation for Navigation</p>
         </header>
 
