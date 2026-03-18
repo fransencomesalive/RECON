@@ -1,6 +1,0 @@
-Risk / Assumption,Impact,Mitigation,Release,
-OSM tag completeness varies,Surface/hours/access may be missing in rural areas,Use confidence scoring + explicit 'unknown'; allow user feedback later,V1,
-Cell coverage data isn't real-time,May over/underestimate service,Label as 'coverage confidence'; enable carrier selection in V2,V1,
-Trailforks API access not guaranteed,Conditions feature may be unavailable,Ship behind feature flag; add other sources later,V1,
-Municipal closures fragmented,Hard to cover globally,Plugin-based connectors; start with a few target regions,V2,
-Weather licensing varies,Global provider may require paid plan for commercial,Use NWS for US; treat Open-Meteo as dev fallback; decide licensing before launch,V1,

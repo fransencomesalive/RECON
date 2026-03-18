@@ -39,3 +39,9 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# project briefs / reference docs (keep local only)
+*.xlsx
+RECON_v1_*/
+RECON_v1_*.csv
+favicon.png
