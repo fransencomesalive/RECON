@@ -1,0 +1,142 @@
+/* ─── Shell ───────────────────────────────────────────────────────────────── */
+.root {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  background: #011c24;
+}
+
+.bgCanvas {
+  position: fixed;
+  inset: 0;
+  display: block;
+  filter: blur(90px);
+  pointer-events: none;
+}
+
+.grainCanvas {
+  position: fixed;
+  inset: 0;
+  display: block;
+  mix-blend-mode: screen;
+  pointer-events: none;
+}
+
+/* ─── Layout ──────────────────────────────────────────────────────────────── */
+.layout {
+  position: relative;
+  z-index: 1;
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2rem;
+  padding: 2rem 1.5rem;
+}
+
+/* ─── Wordmark ────────────────────────────────────────────────────────────── */
+.header {
+  text-align: center;
+}
+
+.wordmark {
+  font-family: var(--font-geist-mono, monospace);
+  font-size: clamp(1.25rem, 4vw, 1.75rem);
+  font-weight: 700;
+  letter-spacing: 0.3em;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+/* ─── Card ────────────────────────────────────────────────────────────────── */
+.card {
+  background: rgba(255, 255, 255, 0.60);
+  border: 3px solid #fdb618;
+  border-radius: 4px;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  padding: 2rem 1.75rem 1.5rem;
+  width: 100%;
+  max-width: 600px;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 1.25rem;
+}
+
+/* ─── Route SVG ───────────────────────────────────────────────────────────── */
+.routeSvg {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+/* Moving dot pulse */
+.dot {
+  filter: drop-shadow(0 0 4px #ed1c24);
+  animation: pulse 0.8s ease-in-out infinite alternate;
+}
+
+@keyframes pulse {
+  from { r: 4; opacity: 1; }
+  to   { r: 7; opacity: 0.6; }
+}
+
+/* ─── Stage label ─────────────────────────────────────────────────────────── */
+.stageRow {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.stageIndicator {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #ed1c24;
+  flex-shrink: 0;
+  animation: blink 1s step-start infinite;
+}
+
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0; }
+}
+
+.stageLabel {
+  font-family: var(--font-geist-mono, monospace);
+  font-size: 0.8rem;
+  letter-spacing: 0.08em;
+  color: #111;
+  animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ─── Stage progress dots ─────────────────────────────────────────────────── */
+.stageDots {
+  display: flex;
+  gap: 0.4rem;
+  align-items: center;
+}
+
+.stageDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.15);
+  transition: background 0.3s;
+  flex-shrink: 0;
+}
+
+.stageDotDone {
+  background: #fdb618;
+}
+
+.stageDotActive {
+  background: #ed1c24;
+  box-shadow: 0 0 6px #ed1c24;
+}

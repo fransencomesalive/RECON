@@ -224,7 +224,7 @@ export default function ReconPage() {
 
   const handleSubmit = () => {
     if (!canSubmit) return
-    router.push('/results')
+    router.push('/processing')
   }
 
   // ── Render ────────────────────────────────────────────────────────────────
