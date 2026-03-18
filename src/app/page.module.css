@@ -41,14 +41,15 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
   padding: 3rem 1.5rem 2rem;
-  gap: 2rem;
+  gap: 0;
 }
 
 /* ─── Logo lockup ─────────────────────────────────────────────────────────── */
 .header {
   text-align: center;
+  margin-bottom: 40px;
 }
 
 .wordmark {
@@ -63,9 +64,10 @@
 }
 
 .logoImg {
-  width: clamp(200px, 32vw, 320px);
+  width: clamp(270px, 43vw, 432px);
   height: auto;
   display: block;
+  margin: 0 auto;
   filter: drop-shadow(0 4px 24px rgba(0, 0, 0, 0.55)) drop-shadow(0 1px 6px rgba(0, 0, 0, 0.4));
 }
 
@@ -112,6 +114,15 @@
 
 .cardUrl {
   cursor: default;
+}
+
+.comingSoon {
+  display: block;
+  font-family: var(--font-geist-mono, monospace);
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  color: rgba(255, 255, 255, 0.35);
+  margin-top: 0.4rem;
 }
 
 .cardDragging {
@@ -164,7 +175,7 @@
 }
 
 .urlInput::placeholder {
-  color: #888;
+  color: #333;
 }
 
 .urlBadge {
@@ -208,6 +219,13 @@
   background: rgba(255, 255, 255, 0.2);
 }
 
+.dividerPlain {
+  height: 1px;
+  background: rgba(255, 255, 255, 0.2);
+  margin: 0.75rem 0;
+  width: 100%;
+}
+
 /* ─── Date input ──────────────────────────────────────────────────────────── */
 .dateCard {
   background: var(--card-bg);
@@ -219,7 +237,6 @@
   display: flex;
   flex-direction: column;
   gap: 0.4rem;
-  margin-top: 0.75rem;
 }
 
 .dateLabel {
@@ -283,6 +300,7 @@
 
 /* ─── Footer ──────────────────────────────────────────────────────────────── */
 .footer {
+  margin-top: auto;
   width: 100%;
   max-width: 520px;
   display: flex;

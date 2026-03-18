@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import Image from 'next/image'
 import styles from './processing.module.css'
 
 // ─── Mesh gradient (shared with intake) ──────────────────────────────────────
@@ -85,7 +86,39 @@ export default function ProcessingPage() {
 
   const [stageIndex, setStageIndex] = useState(0)
   const [done, setDone]             = useState(false)
+  const [apiError, setApiError]     = useState<string | null>(null)
+  const resultIdRef = useRef<string | null>(null)
   const router = useRouter()
+
+  // ── Call /api/analyze in the background ─────────────────────────────────────
+  useEffect(() => {
+    const fileData  = sessionStorage.getItem('recon_file_data')
+    const fileName  = sessionStorage.getItem('recon_file_name')
+    const rideDate  = sessionStorage.getItem('recon_ride_date') ?? new Date().toISOString().split('T')[0]
+    const routeUrl  = sessionStorage.getItem('recon_route_url')
+
+    if (!fileData && !routeUrl) {
+      setApiError('No route data found. Please go back and upload a file.')
+      return
+    }
+
+    fetch('/api/analyze', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ file_data: fileData ?? undefined, file_name: fileName ?? undefined, url: routeUrl ?? undefined, ride_date: rideDate }),
+    })
+      .then(r => r.json())
+      .then(data => {
+        if (data.error) { setApiError(data.error); return }
+        resultIdRef.current = data.id
+        // Clean up sessionStorage
+        sessionStorage.removeItem('recon_file_data')
+        sessionStorage.removeItem('recon_file_name')
+        sessionStorage.removeItem('recon_route_url')
+      })
+      .catch(err => setApiError(err.message ?? 'Analysis failed.'))
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   // ── Mesh gradient ───────────────────────────────────────────────────────────
   useEffect(() => {
@@ -176,7 +209,15 @@ export default function ProcessingPage() {
         raf = requestAnimationFrame(animate)
       } else {
         setDone(true)
-        setTimeout(() => router.push('/results'), 600)
+        // Wait for API to finish (poll resultIdRef), then navigate
+        const waitAndNavigate = () => {
+          if (resultIdRef.current) {
+            router.push(`/results/${resultIdRef.current}`)
+          } else if (!apiError) {
+            setTimeout(waitAndNavigate, 300)
+          }
+        }
+        setTimeout(waitAndNavigate, 600)
       }
     }
 
@@ -186,7 +227,43 @@ export default function ProcessingPage() {
     }, 500)
 
     return () => { clearTimeout(timer); cancelAnimationFrame(raf) }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router])
+
+  if (apiError) {
+    const isStravaError = apiError === 'STRAVA_AUTH_REQUIRED'
+    return (
+      <main className={styles.root}>
+        <canvas ref={bgRef}    className={styles.bgCanvas} />
+        <canvas ref={grainRef} className={styles.grainCanvas} />
+        <div className={styles.layout}>
+          <div className={styles.card}>
+            {isStravaError ? (
+              <>
+                <p style={{ color: '#ed1c24', fontFamily: 'monospace', textAlign: 'center', padding: '1rem 1rem 0' }}>
+                  Strava requires login to access this route.
+                </p>
+                <p style={{ color: 'rgba(255,255,255,0.75)', fontFamily: 'monospace', fontSize: '0.85rem', textAlign: 'center', padding: '0.5rem 1rem 1rem', lineHeight: 1.6 }}>
+                  Export a <strong>.gpx</strong> file from Strava and upload it directly:<br />
+                  Strava → Your Route → <strong>⋯ → Export GPX</strong>
+                </p>
+              </>
+            ) : (
+              <p style={{ color: '#ed1c24', fontFamily: 'monospace', textAlign: 'center', padding: '1rem' }}>
+                {apiError}
+              </p>
+            )}
+            <button
+              onClick={() => router.push('/')}
+              style={{ marginTop: '0.5rem', background: '#fdb618', border: 'none', borderRadius: '4px', padding: '0.5rem 1.5rem', fontWeight: 700, cursor: 'pointer', display: 'block', margin: '0 auto 1rem' }}
+            >
+              ← Back
+            </button>
+          </div>
+        </div>
+      </main>
+    )
+  }
 
   return (
     <main className={styles.root}>
@@ -196,7 +273,14 @@ export default function ProcessingPage() {
       <div className={styles.layout}>
 
         <header className={styles.header}>
-          <span className={styles.wordmark}>R.E.C.O.N.</span>
+          <Image
+            src="/RECON-logo-topo.png"
+            alt="R.E.C.O.N."
+            width={320}
+            height={120}
+            priority
+            className={styles.logoImg}
+          />
         </header>
 
         <div className={styles.card}>

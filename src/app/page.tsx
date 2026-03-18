@@ -48,17 +48,16 @@ function drawMesh(ctx: CanvasRenderingContext2D, nodes: MeshNode[], W: number, H
 
 // ─── URL detection ────────────────────────────────────────────────────────────
 
-type UrlType = 'strava' | 'mapmyride' | 'unknown' | null
 
-function detectUrlType(url: string): UrlType {
-  if (url.includes('strava.com')) return 'strava'
-  if (url.includes('mapmyfitness.com') || url.includes('mapmyride.com')) return 'mapmyride'
-  return 'unknown'
-}
+// ─── URL validation ───────────────────────────────────────────────────────────
 
-const URL_LABELS: Record<string, string> = {
-  strava: 'Strava Route',
-  mapmyride: 'MapMyRide Route',
+function isValidUrl(url: string): boolean {
+  try {
+    const u = new URL(url)
+    return u.protocol === 'http:' || u.protocol === 'https:'
+  } catch {
+    return false
+  }
 }
 
 // ─── Data sources for footer ──────────────────────────────────────────────────
@@ -86,9 +85,7 @@ export default function ReconPage() {
   const [fileError, setFileError]       = useState<string | null>(null)
   const [isDragging, setIsDragging]     = useState(false)
 
-  const [url, setUrl]           = useState('')
-  const [urlType, setUrlType]   = useState<UrlType>(null)
-  const [urlError, setUrlError] = useState<string | null>(null)
+  const [url, setUrl] = useState('')
 
   const todayISO = new Date().toISOString().split('T')[0]
   const [rideDate, setRideDate]       = useState(todayISO)
@@ -185,14 +182,14 @@ export default function ReconPage() {
 
   const validateFile = (file: File): boolean => {
     const ext = file.name.split('.').pop()?.toLowerCase()
-    if (!['gpx', 'tcx', 'fit'].includes(ext ?? '')) {
-      setFileError('Unsupported file type. Use GPX, TCX, or FIT.')
+    if (!['gpx', 'tcx'].includes(ext ?? '')) {
+      setFileError('Unsupported file type. Use GPX or TCX.')
       setSelectedFile(null)
       return false
     }
     setFileError(null)
     setSelectedFile(file)
-    setUrl(''); setUrlType(null); setUrlError(null)
+    setUrl('')
     return true
   }
 
@@ -215,17 +212,13 @@ export default function ReconPage() {
   const handleUrlChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value
     setUrl(val)
-    if (!val) { setUrlType(null); setUrlError(null); return }
-    const type = detectUrlType(val)
-    setUrlType(type)
-    setUrlError(type === 'unknown' ? 'Paste a Strava or MapMyRide route URL.' : null)
-    if (type !== 'unknown') { setSelectedFile(null); setFileError(null) }
+    if (val) { setSelectedFile(null); setFileError(null) }
   }, [])
 
   // ── Submit ────────────────────────────────────────────────────────────────
 
   const canSubmit = (selectedFile !== null && !fileError) ||
-                    (url !== '' && urlType !== null && urlType !== 'unknown' && !urlError)
+                    (url !== '' && isValidUrl(url))
 
   const handleDateChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value
@@ -238,8 +231,28 @@ export default function ReconPage() {
     }
   }, [])
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!canSubmit) return
+
+    if (selectedFile) {
+      // Encode file as base64 — chunked to avoid call stack overflow on large files
+      const buffer = await selectedFile.arrayBuffer()
+      const bytes = new Uint8Array(buffer)
+      let binary = ''
+      const CHUNK = 8192
+      for (let i = 0; i < bytes.length; i += CHUNK) {
+        binary += String.fromCharCode(...bytes.subarray(i, i + CHUNK))
+      }
+      const base64 = btoa(binary)
+      sessionStorage.setItem('recon_file_data', base64)
+      sessionStorage.setItem('recon_file_name', selectedFile.name)
+      sessionStorage.removeItem('recon_route_url')
+    } else if (url) {
+      sessionStorage.setItem('recon_route_url', url)
+      sessionStorage.removeItem('recon_file_data')
+      sessionStorage.removeItem('recon_file_name')
+    }
+
     sessionStorage.setItem('recon_ride_date', rideDate)
     router.push('/processing')
   }
@@ -256,14 +269,13 @@ export default function ReconPage() {
         {/* Logo lockup */}
         <header className={styles.header}>
           <Image
-            src="/recon-logo.png"
+            src="/RECON-logo-topo.png"
             alt="R.E.C.O.N."
             width={320}
             height={120}
             priority
             className={styles.logoImg}
           />
-          <p className={styles.tagline}>Route Environment &amp; Condition Observation for Navigation</p>
         </header>
 
         {/* Intake */}
@@ -288,7 +300,7 @@ export default function ReconPage() {
             <input
               ref={fileInputRef}
               type="file"
-              accept=".gpx,.tcx,.fit"
+              accept=".gpx,.tcx"
               className={styles.hidden}
               onChange={handleFileInput}
             />
@@ -297,7 +309,7 @@ export default function ReconPage() {
             ) : (
               <>
                 <span className={styles.cardLabel}>Drop route file here</span>
-                <span className={styles.cardSub}>GPX · TCX · FIT</span>
+                <span className={styles.cardSub}>GPX · TCX</span>
               </>
             )}
             {fileError && <span className={styles.errorMsg}>{fileError}</span>}
@@ -310,23 +322,25 @@ export default function ReconPage() {
             className={[
               styles.card,
               styles.cardUrl,
-              urlError              ? styles.cardError  : '',
-              urlType && !urlError  ? styles.cardFilled : '',
+              url && !isValidUrl(url) ? styles.cardError  : '',
+              url &&  isValidUrl(url) ? styles.cardFilled : '',
             ].join(' ')}
           >
             <input
               type="text"
               className={styles.urlInput}
-              placeholder="Paste a Strava or MapMyRide route URL"
+              placeholder="Paste a direct link to a GPX or TCX file"
               value={url}
               onChange={handleUrlChange}
               onClick={(e) => e.stopPropagation()}
             />
-            {urlType && !urlError && (
-              <span className={styles.urlBadge}>{URL_LABELS[urlType]}</span>
+            {url && !isValidUrl(url) && (
+              <span className={styles.errorMsg}>Enter a valid http/https URL</span>
             )}
-            {urlError && <span className={styles.errorMsg}>{urlError}</span>}
+            <span className={styles.comingSoon}>Strava · MapMyRide import coming in V2</span>
           </div>
+
+          <div className={styles.dividerPlain} />
 
           {/* Date input */}
           <div className={styles.dateCard}>

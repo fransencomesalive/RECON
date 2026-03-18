@@ -328,10 +328,10 @@ export default function ResultsPage() {
           <div className={styles.headerLeft}>
             <a href="/">
               <Image
-                src="/recon-logo.png"
+                src="/RECON-logo-topo.png"
                 alt="R.E.C.O.N."
-                width={160}
-                height={60}
+                width={336}
+                height={126}
                 priority
                 className={styles.logoImg}
               />
@@ -340,16 +340,15 @@ export default function ResultsPage() {
           <div className={styles.headerCenter} />
           <div className={styles.headerRight}>
             <button
-              className={styles.unitToggle}
+              className={[styles.pill, styles.pillActive].join(' ')}
               onClick={() => setUnit(u => u === 'imperial' ? 'metric' : 'imperial')}
             >
               {unit === 'imperial' ? 'Miles / Feet' : 'Kilometers / Meters'}
-              <span className={styles.unitArrow}>▾</span>
             </button>
-            <button className={styles.actionBtn} onClick={handleCopy}>
+            <button className={styles.pill} onClick={handleCopy}>
               {copied ? 'Copied!' : 'Share'}
             </button>
-            <button className={styles.actionBtn}>Export</button>
+            <button className={styles.pill}>Export</button>
           </div>
         </header>
 
