@@ -1,0 +1,14 @@
+Epic ID,Epic,Story ID,User Story,Acceptance Criteria,Dependencies,Release
+E1,Route Intake,S1.1,Upload GPX/TCX/FIT and get a normalized route object.,Uploads parse; route polyline + distance + elevation gain computed; errors are actionable.,FIT SDK; GPX/TCX parsers,V1
+E1,Route Intake,S1.2,Connect Strava and import one of my routes.,OAuth works; list routes; select one; pull route geometry; store per-user token securely.,Strava API,V1
+E1,Route Intake,S1.3,Connect MapMyFitness and import a route.,OAuth works; fetch route geometry; normalize.,MapMyFitness API,V1 (optional)
+E2,OSM Enrichment,S2.1,See surface breakdown for my route.,Compute % by surface/highway classes with confidence notes.,Overpass API,V1
+E2,OSM Enrichment,S2.2,See water/resupply/shops along the route.,POIs returned within corridor; dedup; categorize; compute distances.,Overpass API,V1
+E2,OSM Enrichment,S2.3,See emergency bailout options.,Identify towns/transit/bike shops/shelters; provide nearest points.,Overpass API + heuristics,V1
+E3,Weather,S3.1,See weather by route segment.,Sample points; call weather API; summarize by segment; flag risk.,NWS (US) / Open-Meteo fallback,V1
+E3,Weather,S3.2,See active alerts affecting my route.,Pull alerts; attach to segments; show severity and timing.,NWS Alerts API,V1 (US)
+E4,Public Lands,S4.1,See if my route crosses NPS/USFS/BLM/etc.,Intersect route corridor with PAD-US / Federal Lands; display land manager.,PAD-US / Esri federal lands,V1 (US)
+E5,Coverage,S5.1,See cell-coverage confidence along the route (US).,Intersect corridor with FCC coverage layer; produce confidence bands.,FCC National Broadband Map datasets,V1 (US)
+E6,Conditions,S6.1,"See recent trail reports near the route, with dates.","If Trailforks approved, pull reports; show date + source; else hide feature.",Trailforks (approved),V1 optional / V2
+E7,Visual Recon,S7.1,See representative on-route photos for context.,Use Mapillary to fetch nearby imagery; select a small set; show source links.,Mapillary API,V1 optional
+E7,Visual Recon,S7.2,See Strava-sourced route imagery where supported.,Prefer Strava images/metadata for routes/segments if available via supported API scopes; fallback Mapillary.,Strava (future),V2

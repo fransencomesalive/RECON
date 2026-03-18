@@ -4,7 +4,7 @@
   --amber-dark:  #d4960e;
   --error:       #ed1c24;
   --teal-deep:   #011c24;
-  --card-bg:     rgba(255, 255, 255, 0.60);
+  --card-bg:     rgba(255, 255, 255, 0.40);
   --card-border: 3px solid var(--amber);
   --card-radius: 4px;
 }

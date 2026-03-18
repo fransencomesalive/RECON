@@ -1,0 +1,17 @@
+RECON — V1 MVP Brief (Claude Code Ready),,,,
+,,,,
+Project,RECON — Route Environment & Condition Observation for Navigation,,,
+Domain,recon.mettlecycling.com,,,
+Primary user journey,"User pastes a route link (Strava, MapMyRide/MapMyFitness) or uploads a route file (GPX/TCX/FIT). RECON normalizes the route geometry + elevation, segments it, enriches it from data sources, and returns: (1) a route dossier, (2) an interactive map with overlays, (3) a plain-language ride planning summary.",,,
+V1 goal,"Deliver a high-signal route dossier + map overlays using sources we can access reliably without partner deals, and design the architecture so richer sources can be swapped in for V2.",,,
+Non-goals for V1 (explicit),"• Universal parcel-accurate private property lines
+• Guaranteed business hours freshness everywhere
+• Universal municipal closure coverage
+• Social photo harvesting from third-party sites without explicit supported APIs / permissions",,,
+Key MVP outputs,"• Surface breakdown (best-effort)
+• Public lands / land manager overlay (US-focused)
+• Weather-by-segment (US: NWS; Global fallback: Open-Meteo in dev)
+• Water + resupply + bike shop + emergency POIs
+• Supply gaps (distance between critical points)
+• Trail conditions (optional: Trailforks if approved)
+• Visual recon imagery (optional: Mapillary; V2: prefer Strava imagery where supported)",,,

@@ -1,0 +1,6 @@
+Output,Contents,Format,Release,
+Interactive map,"Route polyline + toggleable overlays (surface, weather risk, water/resupply, public lands, coverage confidence, conditions, imagery points)",Web map with layers + side panel,V1,
+Route dossier,KPIs + supply gaps + alerts + land manager crossings + top risks + POI tables,Report panel + exportable JSON,V1,
+Plain-language plan,"Planning narrative: resupply gaps, weather windows, bailouts, dead zones, latest trail reports",Markdown/text block,V1,
+Export bundle,Route JSON + enrichment JSON + source links,Download zip (optional),V1,
+Enhanced imagery,Prefer Strava imagery/notes and richer route media where supported; fallback Mapillary,In-map photo cards,V2,
