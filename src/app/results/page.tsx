@@ -48,12 +48,12 @@ const MIN_ELEV  = Math.min(...ELEV_DATA.map(p => p.elev))
 const MAX_ELEV  = Math.max(...ELEV_DATA.map(p => p.elev))
 
 const MOCK_POIS = [
-  { type: 'water',     name: 'Spring Creek',      mile: 8.2  },
-  { type: 'shop',      name: 'Summit Cycles',      mile: 12.1 },
-  { type: 'water',     name: 'Ridgeline Cache',    mile: 23.4 },
-  { type: 'bailout',   name: 'Hwy 34 Junction',    mile: 31.0 },
-  { type: 'water',     name: 'Valley Pump',        mile: 38.2 },
-  { type: 'emergency', name: 'Fire Station 14',    mile: 42.8 },
+  { type: 'water',     name: 'Spring Creek',      mile: 8.2,  potable: true  },
+  { type: 'shop',      name: 'Summit Cycles',      mile: 12.1                 },
+  { type: 'water',     name: 'Ridgeline Cache',    mile: 23.4, potable: false },
+  { type: 'bailout',   name: 'Hwy 34 Junction',    mile: 31.0                 },
+  { type: 'water',     name: 'Valley Pump',        mile: 38.2, potable: true  },
+  { type: 'emergency', name: 'Fire Station 14',    mile: 42.8                 },
 ]
 
 const MOCK_WEATHER_ZONES: { from: number; to: number; status: WeatherStatus }[] = [
@@ -63,7 +63,7 @@ const MOCK_WEATHER_ZONES: { from: number; to: number; status: WeatherStatus }[] 
   { from: 0.82, to: 1.0,  status: 'amber' },
 ]
 
-const MOCK_SURFACE_PCT = { pavement: 52, gravel: 34, dirt: 12, unknown: 2 }
+const MOCK_SURFACE_PCT = { pavement: 52, nonPaved: 48 } // gravel 34% + dirt 12% + unknown 2%
 
 const MOCK_LAND_CROSSINGS = [
   { name: 'USFS Pike National Forest', miles: '18.1 – 29.4', manager: 'USDA Forest Service'       },
@@ -152,11 +152,20 @@ function groupBySurface(pts: ElevPoint[]): SurfaceGroup[] {
   return groups
 }
 
+// All non-pavement uses the same dash — simpler, more readable
 const SURFACE_DASH: Record<SurfaceType, string | undefined> = {
   pavement: undefined,
   gravel:   '10 6',
-  dirt:     '3 6',
-  unknown:  '1 8',
+  dirt:     '10 6',
+  unknown:  '10 6',
+}
+
+function surfaceAreaPath(seg: SurfaceGroup): string {
+  const pts = seg.pts
+  if (pts.length < 2) return ''
+  const d     = pts.map((p, i) => `${i === 0 ? 'M' : 'L'} ${toX(p.dist).toFixed(1)},${toY(p.elev).toFixed(1)}`).join(' ')
+  const first = pts[0], last = pts[pts.length - 1]
+  return `${d} L ${toX(last.dist).toFixed(1)},${CHART_B} L ${toX(first.dist).toFixed(1)},${CHART_B} Z`
 }
 
 const WEATHER_COLOR: Record<WeatherStatus, string> = {
@@ -188,10 +197,17 @@ export default function ResultsPage() {
   const bgRef    = useRef<HTMLCanvasElement>(null)
   const grainRef = useRef<HTMLCanvasElement>(null)
 
-  const [unit,        setUnit]        = useState<Unit>('imperial')
-  const [showWeather, setShowWeather] = useState(false)
+  const [unit,         setUnit]         = useState<Unit>('imperial')
+  const [showWeather,  setShowWeather]  = useState(false)
   const [activeLayers, setActiveLayers] = useState<Set<string>>(new Set(['Route']))
-  const [copied,      setCopied]      = useState(false)
+  const [copied,       setCopied]       = useState(false)
+  const [rideDate,     setRideDate]     = useState('')
+  const [editingDate,  setEditingDate]  = useState(false)
+
+  useEffect(() => {
+    const stored = sessionStorage.getItem('recon_ride_date')
+    setRideDate(stored ?? new Date().toISOString().split('T')[0])
+  }, [])
 
   // ── Mesh gradient ─────────────────────────────────────────────────────────
   useEffect(() => {
@@ -254,15 +270,12 @@ export default function ResultsPage() {
   }, [])
 
   // ── Elevation SVG ─────────────────────────────────────────────────────────
-  const areaPath = (() => {
-    const d = ELEV_DATA.map((p, i) =>
-      `${i === 0 ? 'M' : 'L'} ${toX(p.dist).toFixed(1)},${toY(p.elev).toFixed(1)}`
-    ).join(' ')
-    const last = ELEV_DATA[ELEV_DATA.length - 1]
-    return `${d} L ${toX(last.dist).toFixed(1)},${CHART_B} L ${CHART_L},${CHART_B} Z`
-  })()
-
   const surfaceGroups = groupBySurface(ELEV_DATA)
+
+  const formatRideDate = (iso: string) => {
+    if (!iso) return ''
+    return new Date(iso + 'T12:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+  }
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
@@ -284,13 +297,30 @@ export default function ResultsPage() {
             >
               Breakfast Climb Loop ↗
             </a>
+            {editingDate ? (
+              <input
+                type="date"
+                className={styles.dateEditInput}
+                value={rideDate}
+                autoFocus
+                onChange={e => setRideDate(e.target.value)}
+                onBlur={() => { sessionStorage.setItem('recon_ride_date', rideDate); setEditingDate(false) }}
+                onKeyDown={e => e.key === 'Enter' && (e.currentTarget.blur())}
+              />
+            ) : (
+              <span className={styles.dateDisplay} onClick={() => setEditingDate(true)}>
+                Date: {formatRideDate(rideDate)}
+                <span className={styles.dateEditIcon}>✎</span>
+              </span>
+            )}
           </div>
           <div className={styles.headerRight}>
             <button
               className={styles.unitToggle}
               onClick={() => setUnit(u => u === 'imperial' ? 'metric' : 'imperial')}
             >
-              {unit === 'imperial' ? 'mi / ft' : 'km / m'}
+              {unit === 'imperial' ? 'Miles / Feet' : 'Kilometers / Meters'}
+              <span className={styles.unitArrow}>▾</span>
             </button>
             <button className={styles.actionBtn} onClick={handleCopy}>
               {copied ? 'Copied!' : 'Share'}
@@ -342,15 +372,12 @@ export default function ResultsPage() {
           <div className={[styles.statCard, styles.surfaceStatCard].join(' ')}>
             <span className={styles.statLabel}>Surface Breakdown</span>
             <div className={styles.surfaceBar}>
-              <div className={styles.segPavement} style={{ width: `${MOCK_SURFACE_PCT.pavement}%` }} title={`Pavement ${MOCK_SURFACE_PCT.pavement}%`} />
-              <div className={styles.segGravel}   style={{ width: `${MOCK_SURFACE_PCT.gravel}%` }}   title={`Gravel ${MOCK_SURFACE_PCT.gravel}%`} />
-              <div className={styles.segDirt}     style={{ width: `${MOCK_SURFACE_PCT.dirt}%` }}     title={`Dirt ${MOCK_SURFACE_PCT.dirt}%`} />
-              <div className={styles.segUnknown}  style={{ width: `${MOCK_SURFACE_PCT.unknown}%` }}  title={`Unknown ${MOCK_SURFACE_PCT.unknown}%`} />
+              <div className={styles.segPavement} style={{ width: `${MOCK_SURFACE_PCT.pavement}%` }} title={`Paved ${MOCK_SURFACE_PCT.pavement}%`} />
+              <div className={styles.segNonPaved} style={{ width: `${MOCK_SURFACE_PCT.nonPaved}%` }} title={`Off-road ${MOCK_SURFACE_PCT.nonPaved}%`} />
             </div>
             <div className={styles.surfaceLegend}>
               <span className={styles.legendItem}><span className={[styles.dot, styles.dotPavement].join(' ')} />{MOCK_SURFACE_PCT.pavement}% paved</span>
-              <span className={styles.legendItem}><span className={[styles.dot, styles.dotGravel].join(' ')}   />{MOCK_SURFACE_PCT.gravel}% gravel</span>
-              <span className={styles.legendItem}><span className={[styles.dot, styles.dotDirt].join(' ')}     />{MOCK_SURFACE_PCT.dirt}% dirt</span>
+              <span className={styles.legendItem}><span className={[styles.dot, styles.dotNonPaved].join(' ')} />{MOCK_SURFACE_PCT.nonPaved}% off-road (gravel / dirt)</span>
             </div>
           </div>
         </div>
@@ -373,20 +400,20 @@ export default function ResultsPage() {
             preserveAspectRatio="none"
           >
             <defs>
+              {/* Weather hash patterns */}
               {(['green', 'amber', 'red'] as WeatherStatus[]).map(status => (
-                <pattern
-                  key={status}
-                  id={`hash-${status}`}
-                  patternUnits="userSpaceOnUse"
-                  width="8" height="8"
+                <pattern key={status} id={`hash-${status}`}
+                  patternUnits="userSpaceOnUse" width="8" height="8"
                   patternTransform="rotate(45 0 0)"
                 >
-                  <line x1="0" y1="0" x2="0" y2="8"
-                    stroke={WEATHER_COLOR[status]}
-                    strokeWidth="4"
-                  />
+                  <line x1="0" y1="0" x2="0" y2="8" stroke={WEATHER_COLOR[status]} strokeWidth="4" />
                 </pattern>
               ))}
+              {/* Vertical stripe fill for off-road sections */}
+              <pattern id="offroad-fill" patternUnits="userSpaceOnUse" width="8" height="8">
+                <rect width="8" height="8" fill="rgba(253,182,24,0.12)" />
+                <line x1="0" y1="0" x2="0" y2="8" stroke="#fdb618" strokeWidth="2" opacity="0.45" />
+              </pattern>
             </defs>
 
             {/* Weather band */}
@@ -399,8 +426,17 @@ export default function ResultsPage() {
               )
             })}
 
-            {/* Area fill */}
-            <path d={areaPath} fill="rgba(253,182,24,0.40)" />
+            {/* Per-surface-group area fills */}
+            {surfaceGroups.map((seg, i) => {
+              const isPaved = seg.surface === 'pavement'
+              const aPath   = surfaceAreaPath(seg)
+              if (!aPath) return null
+              return (
+                <path key={`fill-${i}`} d={aPath}
+                  fill={isPaved ? 'rgba(253,182,24,0.30)' : 'url(#offroad-fill)'}
+                />
+              )
+            })}
 
             {/* Surface-segmented stroke */}
             {surfaceGroups.map((seg, i) => {
@@ -408,7 +444,7 @@ export default function ResultsPage() {
                 `${j === 0 ? 'M' : 'L'} ${toX(p.dist).toFixed(1)},${toY(p.elev).toFixed(1)}`
               ).join(' ')
               return (
-                <path key={i} d={d}
+                <path key={`stroke-${i}`} d={d}
                   stroke="#fdb618" strokeWidth="3" fill="none"
                   strokeLinecap="round" strokeLinejoin="round"
                   strokeDasharray={SURFACE_DASH[seg.surface]}
@@ -436,16 +472,12 @@ export default function ResultsPage() {
           {/* Legend */}
           <div className={styles.elevLegend}>
             <span className={styles.legendItem}>
-              <svg width="22" height="4"><line x1="0" y1="2" x2="22" y2="2" stroke="#fdb618" strokeWidth="2.5" /></svg>
+              <svg width="28" height="5"><line x1="0" y1="2.5" x2="28" y2="2.5" stroke="#fdb618" strokeWidth="3" /></svg>
               Pavement
             </span>
             <span className={styles.legendItem}>
-              <svg width="22" height="4"><line x1="0" y1="2" x2="22" y2="2" stroke="#fdb618" strokeWidth="2.5" strokeDasharray="6 3" /></svg>
-              Gravel
-            </span>
-            <span className={styles.legendItem}>
-              <svg width="22" height="4"><line x1="0" y1="2" x2="22" y2="2" stroke="#fdb618" strokeWidth="2.5" strokeDasharray="2 4" /></svg>
-              Dirt
+              <svg width="28" height="5"><line x1="0" y1="2.5" x2="28" y2="2.5" stroke="#fdb618" strokeWidth="3" strokeDasharray="8 5" /></svg>
+              Off-road
             </span>
             <span className={styles.legendDivider} />
             {Object.entries(POI_COLOR).map(([type, col]) => (
@@ -506,7 +538,12 @@ export default function ResultsPage() {
                   return (
                     <tr key={poi.name}>
                       <td className={styles.poiIcon}>{poiSymbol(poi.type)}</td>
-                      <td>{poi.name}</td>
+                      <td>
+                        {poi.name}
+                        {'potable' in poi && poi.potable === false && (
+                          <span className={styles.nonPotable} title="Non-potable source, filter needed">*</span>
+                        )}
+                      </td>
                       <td className={styles.poiMile}>{mileDisplay}</td>
                       <td className={styles.poiGap}>{gapDisplay}</td>
                     </tr>

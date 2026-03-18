@@ -4,7 +4,7 @@
   --amber-dark:  #d4960e;
   --error:       #ed1c24;
   --teal-deep:   #011c24;
-  --card-bg:     rgba(255, 255, 255, 0.40);
+  --card-bg:     rgba(255, 255, 255, 0.30);
   --card-border: 3px solid var(--amber);
   --card-radius: 4px;
 }
@@ -199,6 +199,52 @@
   flex: 1;
   height: 1px;
   background: rgba(255, 255, 255, 0.2);
+}
+
+/* ─── Date input ──────────────────────────────────────────────────────────── */
+.dateCard {
+  background: var(--card-bg);
+  border: var(--card-border);
+  border-radius: var(--card-radius);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  padding: 1rem 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin-top: 0.75rem;
+}
+
+.dateLabel {
+  font-family: var(--font-geist-mono, monospace);
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #555;
+}
+
+.dateInput {
+  background: transparent;
+  border: none;
+  outline: none;
+  font-family: var(--font-geist-sans, sans-serif);
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #111;
+  cursor: pointer;
+  width: 100%;
+}
+
+.dateWarning {
+  font-family: var(--font-geist-sans, sans-serif);
+  font-size: 0.75rem;
+  color: #7c3a10;
+  background: rgba(253, 182, 24, 0.18);
+  border-left: 3px solid var(--amber);
+  padding: 0.4rem 0.6rem;
+  border-radius: 2px;
+  line-height: 1.5;
 }
 
 /* ─── CTA button ──────────────────────────────────────────────────────────── */

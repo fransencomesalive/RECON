@@ -85,9 +85,13 @@ export default function ReconPage() {
   const [fileError, setFileError]       = useState<string | null>(null)
   const [isDragging, setIsDragging]     = useState(false)
 
-  const [url, setUrl]         = useState('')
-  const [urlType, setUrlType] = useState<UrlType>(null)
+  const [url, setUrl]           = useState('')
+  const [urlType, setUrlType]   = useState<UrlType>(null)
   const [urlError, setUrlError] = useState<string | null>(null)
+
+  const todayISO = new Date().toISOString().split('T')[0]
+  const [rideDate, setRideDate]       = useState(todayISO)
+  const [dateWarning, setDateWarning] = useState(false)
 
   const router = useRouter()
 
@@ -222,8 +226,20 @@ export default function ReconPage() {
   const canSubmit = (selectedFile !== null && !fileError) ||
                     (url !== '' && urlType !== null && urlType !== 'unknown' && !urlError)
 
+  const handleDateChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value
+    setRideDate(val)
+    if (val) {
+      const diffDays = (new Date(val).getTime() - Date.now()) / 86400000
+      setDateWarning(diffDays > 10)
+    } else {
+      setDateWarning(false)
+    }
+  }, [])
+
   const handleSubmit = () => {
     if (!canSubmit) return
+    sessionStorage.setItem('recon_ride_date', rideDate)
     router.push('/processing')
   }
 
@@ -302,6 +318,24 @@ export default function ReconPage() {
               <span className={styles.urlBadge}>{URL_LABELS[urlType]}</span>
             )}
             {urlError && <span className={styles.errorMsg}>{urlError}</span>}
+          </div>
+
+          {/* Date input */}
+          <div className={styles.dateCard}>
+            <label className={styles.dateLabel} htmlFor="ride-date">Ride Date</label>
+            <input
+              id="ride-date"
+              type="date"
+              className={styles.dateInput}
+              value={rideDate}
+              onChange={handleDateChange}
+              onClick={(e) => e.stopPropagation()}
+            />
+            {dateWarning && (
+              <span className={styles.dateWarning}>
+                Forecasts beyond 10 days are unavailable. RECON will use historical patterns and typical conditions for this date and region.
+              </span>
+            )}
           </div>
 
           <button

@@ -36,7 +36,7 @@
 
 /* ─── Card (shared) ───────────────────────────────────────────────────────── */
 .card {
-  background: rgba(255, 255, 255, 0.40);
+  background: rgba(255, 255, 255, 0.30);
   border: 3px solid #fdb618;
   border-radius: 4px;
   backdrop-filter: blur(8px);
@@ -78,34 +78,68 @@
   letter-spacing: 0.01em;
 }
 
-.routeName:hover {
-  color: #fdb618;
+.routeName:hover { color: #fdb618; }
+
+.dateDisplay {
+  font-family: var(--font-geist-sans, sans-serif);
+  font-size: 0.82rem;
+  color: rgba(255, 255, 255, 0.6);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  white-space: nowrap;
+}
+
+.dateDisplay:hover { color: #fdb618; }
+
+.dateEditIcon {
+  font-size: 0.7rem;
+  opacity: 0.7;
+}
+
+.dateEditInput {
+  font-family: var(--font-geist-sans, sans-serif);
+  font-size: 0.82rem;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(253, 182, 24, 0.5);
+  border-radius: 3px;
+  padding: 0.15rem 0.4rem;
+  outline: none;
 }
 
 .headerRight {
   display: flex;
   align-items: center;
   gap: 0.5rem;
+  flex-wrap: wrap;
 }
 
 .unitToggle {
   font-family: var(--font-geist-mono, monospace);
   font-size: 0.75rem;
   font-weight: 700;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
+  letter-spacing: 0.06em;
   color: #111;
-  background: rgba(255, 255, 255, 0.40);
+  background: rgba(255, 255, 255, 0.30);
   border: 3px solid #fdb618;
   border-radius: 4px;
   padding: 0.35rem 0.75rem;
   cursor: pointer;
   transition: background 0.15s;
   backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  white-space: nowrap;
 }
 
-.unitToggle:hover {
-  background: rgba(255, 255, 255, 0.6);
+.unitToggle:hover { background: rgba(255, 255, 255, 0.5); }
+
+.unitArrow {
+  font-size: 0.9rem;
+  line-height: 1;
 }
 
 .actionBtn {
@@ -115,7 +149,7 @@
   letter-spacing: 0.1em;
   text-transform: uppercase;
   color: #111;
-  background: rgba(255, 255, 255, 0.40);
+  background: rgba(255, 255, 255, 0.30);
   border: 3px solid #fdb618;
   border-radius: 4px;
   padding: 0.35rem 0.75rem;
@@ -124,9 +158,7 @@
   backdrop-filter: blur(8px);
 }
 
-.actionBtn:hover {
-  background: rgba(255, 255, 255, 0.6);
-}
+.actionBtn:hover { background: rgba(255, 255, 255, 0.5); }
 
 /* ─── Map ─────────────────────────────────────────────────────────────────── */
 .mapSection {
@@ -136,7 +168,7 @@
 }
 
 .mapContainer {
-  background: rgba(255, 255, 255, 0.40);
+  background: rgba(255, 255, 255, 0.30);
   border: 3px solid #fdb618;
   border-radius: 4px;
   overflow: hidden;
@@ -161,31 +193,31 @@
   color: rgba(255, 255, 255, 0.35);
 }
 
-/* ─── Layer toggle pills ──────────────────────────────────────────────────── */
+/* ─── Layer toggle pills → rounded rect ──────────────────────────────────── */
 .layerToggles {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.4rem;
+  gap: 0.5rem;
 }
 
 .pill {
   font-family: var(--font-geist-mono, monospace);
-  font-size: 0.7rem;
+  font-size: 0.77rem;
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: rgba(255, 255, 255, 0.7);
   background: rgba(255, 255, 255, 0.12);
-  border: 2px solid rgba(253, 182, 24, 0.4);
-  border-radius: 2rem;
-  padding: 0.3rem 0.8rem;
+  border: 2px solid rgba(253, 182, 24, 0.45);
+  border-radius: 4px;
+  padding: 0.33rem 0.88rem;
   cursor: pointer;
   transition: background 0.15s, border-color 0.15s, color 0.15s;
   backdrop-filter: blur(4px);
 }
 
 .pill:hover {
-  background: rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.22);
   border-color: #fdb618;
   color: #fff;
 }
@@ -210,61 +242,64 @@
 }
 
 @media (max-width: 720px) {
-  .statsStrip {
-    grid-template-columns: repeat(2, 1fr);
-  }
+  .statsStrip { grid-template-columns: repeat(2, 1fr); }
 }
 
 @media (max-width: 420px) {
-  .statsStrip {
-    grid-template-columns: 1fr;
-  }
+  .statsStrip { grid-template-columns: 1fr; }
 }
 
 .statCard {
-  background: rgba(255, 255, 255, 0.40);
+  background: rgba(255, 255, 255, 0.30);
   border: 3px solid #fdb618;
   border-radius: 4px;
   backdrop-filter: blur(8px);
   padding: 1rem 1.1rem;
   display: flex;
   flex-direction: column;
-  gap: 0.3rem;
+  gap: 0.35rem;
 }
 
-.surfaceStatCard {
-  gap: 0.5rem;
-}
+.surfaceStatCard { gap: 0.55rem; }
 
 .statLabel {
   font-family: var(--font-geist-mono, monospace);
-  font-size: 0.65rem;
-  letter-spacing: 0.12em;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: #555;
+  color: #000;
 }
 
 .statValue {
   font-family: var(--font-geist-mono, monospace);
-  font-size: 1.4rem;
-  font-weight: 700;
-  color: #111;
+  font-size: 1.5rem;
+  font-weight: 300;
+  color: #fdb618;
   line-height: 1;
+  text-shadow: 1px 2px 6px rgba(0, 0, 0, 0.3);
 }
 
 /* Surface breakdown bar */
 .surfaceBar {
   display: flex;
-  height: 8px;
+  height: 9px;
   border-radius: 2px;
   overflow: hidden;
   gap: 1px;
 }
 
-.segPavement { background: #016a7d; }
-.segGravel   { background: #d48728; }
-.segDirt     { background: #7c3a10; }
-.segUnknown  { background: rgba(0, 0, 0, 0.2); }
+.segPavement {
+  background: #016a7d;
+}
+
+.segNonPaved {
+  background: repeating-linear-gradient(
+    90deg,
+    #d48728 0px, #d48728 5px,
+    rgba(212, 135, 40, 0.25) 5px, rgba(212, 135, 40, 0.25) 10px
+  );
+}
 
 .surfaceLegend {
   display: flex;
@@ -275,22 +310,21 @@
 .legendItem {
   display: flex;
   align-items: center;
-  gap: 0.3rem;
+  gap: 0.35rem;
   font-family: var(--font-geist-sans, sans-serif);
-  font-size: 0.7rem;
-  color: #333;
+  font-size: 0.875rem;
+  color: #222;
 }
 
 .dot {
-  width: 8px;
-  height: 8px;
+  width: 9px;
+  height: 9px;
   border-radius: 50%;
   flex-shrink: 0;
 }
 
 .dotPavement { background: #016a7d; }
-.dotGravel   { background: #d48728; }
-.dotDirt     { background: #7c3a10; }
+.dotNonPaved { background: #d48728; }
 
 /* ─── Section title ───────────────────────────────────────────────────────── */
 .sectionTitle {
@@ -334,20 +368,20 @@
 .elevLegend {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.4rem 1rem;
-  margin-top: 0.25rem;
+  gap: 0.5rem 1.25rem;
+  margin-top: 0.4rem;
 }
 
 .legendDivider {
   width: 1px;
-  height: 14px;
+  height: 16px;
   background: rgba(0, 0, 0, 0.2);
   align-self: center;
 }
 
 .legendDot {
-  width: 8px;
-  height: 8px;
+  width: 10px;
+  height: 10px;
   border-radius: 50%;
   flex-shrink: 0;
   display: inline-block;
@@ -362,9 +396,7 @@
 }
 
 @media (max-width: 800px) {
-  .twoCol {
-    grid-template-columns: 1fr;
-  }
+  .twoCol { grid-template-columns: 1fr; }
 }
 
 /* ─── Alerts ──────────────────────────────────────────────────────────────── */
@@ -380,24 +412,11 @@
   font-size: 0.8rem;
 }
 
-.alert strong {
-  font-size: 0.75rem;
-  letter-spacing: 0.05em;
-}
+.alert strong { font-size: 0.75rem; letter-spacing: 0.05em; }
+.alert span   { color: #333; }
 
-.alert span {
-  color: #333;
-}
-
-.alert_amber {
-  border-color: #fdb618;
-  background: rgba(253, 182, 24, 0.12);
-}
-
-.alert_red {
-  border-color: #ed1c24;
-  background: rgba(237, 28, 36, 0.10);
-}
+.alert_amber { border-color: #fdb618; background: rgba(253, 182, 24, 0.12); }
+.alert_red   { border-color: #ed1c24; background: rgba(237, 28, 36, 0.10); }
 
 /* ─── Supply gaps ─────────────────────────────────────────────────────────── */
 .gapRow {
@@ -448,10 +467,7 @@
   border-bottom: 1px solid rgba(0, 0, 0, 0.06);
 }
 
-.poiIcon {
-  font-size: 1rem;
-  width: 1.5rem;
-}
+.poiIcon { font-size: 1rem; width: 1.5rem; }
 
 .poiMile {
   font-family: var(--font-geist-mono, monospace);
@@ -466,6 +482,16 @@
   white-space: nowrap;
 }
 
+.nonPotable {
+  color: #ed1c24;
+  font-weight: 700;
+  font-size: 1rem;
+  margin-left: 2px;
+  cursor: help;
+  vertical-align: super;
+  font-size: 0.65rem;
+}
+
 /* ─── Land management ─────────────────────────────────────────────────────── */
 .landRow {
   display: flex;
@@ -475,18 +501,8 @@
   border-bottom: 1px solid rgba(0, 0, 0, 0.07);
 }
 
-.landName {
-  font-family: var(--font-geist-sans, sans-serif);
-  font-size: 0.82rem;
-  font-weight: 600;
-  color: #111;
-}
-
-.landDetail {
-  font-family: var(--font-geist-sans, sans-serif);
-  font-size: 0.72rem;
-  color: #555;
-}
+.landName   { font-family: var(--font-geist-sans, sans-serif); font-size: 0.82rem; font-weight: 600; color: #111; }
+.landDetail { font-family: var(--font-geist-sans, sans-serif); font-size: 0.72rem; color: #555; }
 
 /* ─── Planning summary ────────────────────────────────────────────────────── */
 .summaryBody {
@@ -504,17 +520,15 @@
   margin: 0;
 }
 
-.summaryBody strong {
-  color: #c45e1a;
-}
+.summaryBody strong { color: #c45e1a; }
 
 /* ─── Photo grid ──────────────────────────────────────────────────────────── */
 .sourceTag {
   font-family: var(--font-geist-mono, monospace);
-  font-size: 0.6rem;
+  font-size: 0.72rem;
   font-weight: 400;
   letter-spacing: 0.08em;
-  color: #888;
+  color: #666;
   margin-left: 0.5rem;
   text-transform: none;
 }
@@ -522,20 +536,18 @@
 .photoGrid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 0.75rem;
+  gap: 1rem;
   margin-top: 0.75rem;
 }
 
 @media (max-width: 640px) {
-  .photoGrid {
-    grid-template-columns: repeat(2, 1fr);
-  }
+  .photoGrid { grid-template-columns: repeat(2, 1fr); }
 }
 
 .photoCard {
   display: flex;
   flex-direction: column;
-  gap: 0.3rem;
+  gap: 0.4rem;
 }
 
 .photoPlaceholder {
@@ -547,8 +559,8 @@
 
 .photoLocation {
   font-family: var(--font-geist-sans, sans-serif);
-  font-size: 0.68rem;
-  color: #444;
+  font-size: 0.85rem;
+  color: #333;
   line-height: 1.4;
 }
 
@@ -562,16 +574,5 @@
   padding-top: 0.5rem;
 }
 
-.version {
-  font-family: var(--font-geist-mono, monospace);
-  font-size: 0.65rem;
-  color: rgba(255, 255, 255, 0.35);
-  letter-spacing: 0.1em;
-}
-
-.disclaimer {
-  font-family: var(--font-geist-sans, sans-serif);
-  font-size: 0.65rem;
-  color: rgba(255, 255, 255, 0.4);
-  text-align: center;
-}
+.version    { font-family: var(--font-geist-mono, monospace); font-size: 0.65rem; color: rgba(255,255,255,0.35); letter-spacing: 0.1em; }
+.disclaimer { font-family: var(--font-geist-sans, sans-serif); font-size: 0.65rem; color: rgba(255,255,255,0.4); text-align: center; }
