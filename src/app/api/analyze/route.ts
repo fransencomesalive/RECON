@@ -8,7 +8,7 @@ import { enrichMapillaryImagery } from '@/lib/mapillary'
 import { storeResult } from '@/lib/store'
 import type { ReconResult, AnalyzeRequest } from '@/lib/types'
 
-export const maxDuration = 10 // seconds — Vercel Hobby plan limit
+export const maxDuration = 60 // seconds
 
 // ─── POST /api/analyze ────────────────────────────────────────────────────────
 
@@ -88,7 +88,10 @@ export async function POST(req: Request) {
     let narrative = ''
     if (process.env.ANTHROPIC_API_KEY) {
       try {
-        narrative = await generateNarrative({ route, surfaces, pois, supply_gaps, weather, lands })
+        narrative = await Promise.race([
+          generateNarrative({ route, surfaces, pois, supply_gaps, weather, lands }),
+          new Promise<string>((_, reject) => setTimeout(() => reject(new Error('narrative timeout')), 3_000)),
+        ])
       } catch (e) {
         errors['narrative'] = (e as Error).message
       }
