@@ -90,7 +90,7 @@ export async function POST(req: Request) {
       try {
         narrative = await Promise.race([
           generateNarrative({ route, surfaces, pois, supply_gaps, weather, lands }),
-          new Promise<string>((_, reject) => setTimeout(() => reject(new Error('narrative timeout')), 3_000)),
+          new Promise<string>((_, reject) => setTimeout(() => reject(new Error('narrative timeout')), 20_000)),
         ])
       } catch (e) {
         errors['narrative'] = (e as Error).message

@@ -1,7 +1,11 @@
 import { v4 as uuidv4 } from 'uuid'
 import type { BailoutDestinationType, BailoutRoute, CanonicalRoute, POI, POIType, SurfaceStat, SurfaceSegment, SurfaceType, SupplyGap } from './types'
 
-const OVERPASS_URL = 'https://overpass-api.de/api/interpreter'
+const OVERPASS_MIRRORS = [
+  'https://overpass-api.de/api/interpreter',
+  'https://overpass.kumi.systems/api/interpreter',
+  'https://maps.mail.ru/osm/tools/overpass/api/interpreter',
+]
 const CORRIDOR_BUFFER_DEG = 0.02 // ~2 km buffer around bbox
 
 // ─── Overpass query builder ───────────────────────────────────────────────────
@@ -16,7 +20,7 @@ function buildQuery(bbox: [number, number, number, number]): string {
   const b = `${s},${w},${n},${e}`
 
   return `
-[out:json][timeout:5];
+[out:json][timeout:20];
 (
   way["highway"]["surface"](${b});
   way["highway"]["tracktype"](${b});
@@ -571,16 +575,27 @@ export async function enrichFromOverpass(route: CanonicalRoute): Promise<{
   bailouts: BailoutRoute[]
 }> {
   const query = buildQuery(route.bbox)
+  const body = `data=${encodeURIComponent(query)}`
 
-  const res = await fetch(OVERPASS_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: `data=${encodeURIComponent(query)}`,
-    signal: AbortSignal.timeout(6_000),
-  })
+  let res: Response | null = null
+  let lastError = ''
+  for (const mirror of OVERPASS_MIRRORS) {
+    try {
+      const r = await fetch(mirror, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body,
+        signal: AbortSignal.timeout(30_000),
+      })
+      if (r.ok) { res = r; break }
+      lastError = `${r.status} ${r.statusText}`
+    } catch (e) {
+      lastError = (e as Error).message
+    }
+  }
 
-  if (!res.ok) {
-    throw new Error(`Overpass API error: ${res.status} ${res.statusText}`)
+  if (!res) {
+    throw new Error(`Overpass API error: ${lastError}`)
   }
 
   const data: OverpassResponse = await res.json()
