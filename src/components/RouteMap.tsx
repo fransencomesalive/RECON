@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef } from 'react'
-import type { ReconResult, SurfaceType, WeatherRisk } from '@/lib/types'
+import type { CoverageConfidence, ReconResult, SurfaceType, WeatherRisk, WeatherSegment } from '@/lib/types'
 
 // Mapbox is a large library — loaded dynamically to avoid SSR issues
 // and keep the initial bundle lean.
@@ -10,7 +10,7 @@ const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN ?? ''
 
 // ─── Layer visibility config ─────────────────────────────────────────────────
 
-export type MapLayer = 'Route' | 'Surface' | 'Weather' | 'Public Lands' | 'Coverage' | 'POIs'
+export type MapLayer = 'Route' | 'Surface' | 'Weather' | 'Public Lands' | 'Mobile Coverage' | 'POIs'
 
 // ─── Color helpers ────────────────────────────────────────────────────────────
 
@@ -27,28 +27,51 @@ const WEATHER_COLOR: Record<WeatherRisk, string> = {
   red:   '#ed1c24',
 }
 
-const POI_COLOR: Record<string, string> = {
-  water:     '#00aac9',
-  shop:      '#fdb618',
-  bailout:   '#ed1c24',
-  emergency: '#fcba4b',
-  shelter:   '#aaaaaa',
+const COVERAGE_COLOR: Record<CoverageConfidence, string> = {
+  good:    '#2d8a4e',
+  fair:    '#fdb618',
+  poor:    '#ed1c24',
+  none:    '#555555',
+  unknown: '#444444',
+}
+
+function poiEmoji(poi: { type: string; potable?: boolean; note?: string }): string {
+  switch (poi.type) {
+    case 'water':     return poi.potable === false ? '🐟' : '🚰'
+    case 'shop':      return poi.note === 'Self-serve repair station' ? '🔧' : '🛠️'
+    case 'emergency':
+      if (poi.note === 'Fire station')                        return '🚒'
+      if (poi.note === 'Hospital' || poi.note === 'Medical clinic') return '🏥'
+      if (poi.note === "Doctor's office")                     return '🩺'
+      if (poi.note === 'Emergency phone')                     return '📞'
+      return '🆘'
+    case 'shelter':   return '🛖'
+    default:          return '📍'
+  }
 }
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 
 interface RouteMapProps {
-  result:       ReconResult
-  activeLayers: Set<string>
-  className?:   string
+  result:           ReconResult
+  activeLayers:     Set<string>
+  weatherSegments?: WeatherSegment[]  // client-computed time-aware override
+  className?:       string
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export default function RouteMap({ result, activeLayers, className }: RouteMapProps) {
-  const containerRef = useRef<HTMLDivElement>(null)
+export default function RouteMap({ result, activeLayers, weatherSegments, className }: RouteMapProps) {
+  const containerRef       = useRef<HTMLDivElement>(null)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const mapRef       = useRef<any>(null)
+  const mapRef             = useRef<any>(null)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const poiMarkersRef      = useRef<any[]>([])
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const bailoutMarkersRef  = useRef<any[]>([])
+  // Ref so the async map load callback can read the current activeLayers
+  const activeLayersRef    = useRef<Set<string>>(activeLayers)
+  useEffect(() => { activeLayersRef.current = activeLayers }, [activeLayers])
 
   // ── Init map ────────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -175,54 +198,29 @@ export default function RouteMap({ result, activeLayers, className }: RouteMapPr
           })
         }
 
-        // ── POI markers ───────────────────────────────────────────────────
-        if (result.pois.length > 0) {
-          const poiFeatures = result.pois.map(poi => ({
-            type: 'Feature' as const,
-            geometry: { type: 'Point' as const, coordinates: [poi.lng, poi.lat] },
-            properties: {
-              name:  poi.name,
-              type:  poi.type,
-              color: POI_COLOR[poi.type] ?? '#aaa',
-            },
-          }))
+        // ── POI markers (HTML — emoji render reliably, toggle via ref) ────
+        const poiMarkers: any[] = [] // eslint-disable-line @typescript-eslint/no-explicit-any
+        for (const poi of result.pois) {
+          const el = document.createElement('div')
+          el.textContent = poiEmoji(poi)
+          el.style.cssText = 'font-size:24px;line-height:1;cursor:pointer;user-select:none;filter:drop-shadow(0 1px 3px rgba(0,0,0,0.55));'
 
-          map.addSource('pois', {
-            type: 'geojson',
-            data: { type: 'FeatureCollection', features: poiFeatures },
-          })
+          const noteHtml  = poi.note ? `<br><span style="opacity:0.75">${poi.note}</span>` : ''
+          const filterHtml = poi.potable === false ? '<br><span style="color:#ed1c24">⚠ Filter required</span>' : ''
 
-          map.addLayer({
-            id:     'poi-circles',
-            type:   'circle',
-            source: 'pois',
-            paint: {
-              'circle-radius':       6,
-              'circle-color':        ['get', 'color'],
-              'circle-stroke-width': 2,
-              'circle-stroke-color': '#011c24',
-            },
-          })
+          new mapboxgl.Marker({ element: el })
+            .setLngLat([poi.lng, poi.lat])
+            .setPopup(new mapboxgl.Popup({ offset: 16, closeButton: false }).setHTML(
+              `<div style="font-family:monospace;font-size:11px;color:#fdb618;background:#011c24;padding:6px 10px;border-radius:3px;line-height:1.8">` +
+              `<strong style="font-size:12px">${poiEmoji(poi)} ${poi.name}</strong>` +
+              noteHtml + filterHtml +
+              `</div>`
+            ))
+            .addTo(map)
 
-          // Tooltip on hover
-          const popup = new mapboxgl.Popup({ closeButton: false, closeOnClick: false, offset: 10 })
-
-          map.on('mouseenter', 'poi-circles', e => {
-            map.getCanvas().style.cursor = 'pointer'
-            const feature = e.features?.[0]
-            if (!feature) return
-            const coords = (feature.geometry as GeoJSON.Point).coordinates as [number, number]
-            const { name, type } = feature.properties as { name: string; type: string }
-            popup.setLngLat(coords).setHTML(
-              `<div style="font-family:monospace;font-size:12px;color:#fdb618;background:#011c24;padding:4px 8px;border-radius:3px">${type}: ${name}</div>`
-            ).addTo(map)
-          })
-
-          map.on('mouseleave', 'poi-circles', () => {
-            map.getCanvas().style.cursor = ''
-            popup.remove()
-          })
+          poiMarkers.push(el)
         }
+        poiMarkersRef.current = poiMarkers
 
         // ── Land crossings (boundary lines) ───────────────────────────────
         if (result.lands.length > 0) {
@@ -257,6 +255,118 @@ export default function RouteMap({ result, activeLayers, className }: RouteMapPr
           })
         }
 
+        // ── Bailout routes ─────────────────────────────────────────────────
+        const bailouts = (result.bailouts ?? []).filter(b => b.road_geometry.length >= 2)
+        console.log('[RECON] bailouts:', bailouts.map(b => ({
+          destination: b.destination_name,
+          saves_km: b.saves_km,
+          geometry_points: b.road_geometry.length,
+          intersection: [b.intersection_lng, b.intersection_lat],
+        })))
+        if (bailouts.length > 0) {
+          const bailoutFeatures = bailouts.map(b => {
+            return {
+              type: 'Feature' as const,
+              geometry: { type: 'LineString' as const, coordinates: b.road_geometry },
+              properties: { destination: b.destination_name, saves_km: b.saves_km },
+            }
+          })
+
+          map.addSource('bailouts', {
+            type: 'geojson',
+            data: { type: 'FeatureCollection', features: bailoutFeatures },
+          })
+
+          map.addLayer({
+            id:     'bailout-line',
+            type:   'line',
+            source: 'bailouts',
+            layout: { 'line-join': 'round', 'line-cap': 'round' },
+            paint: {
+              'line-color':     '#fdb618',
+              'line-width':     5,
+              'line-opacity':   0.95,
+              'line-dasharray': [4, 3],
+            },
+          })
+
+          // 🛑 marker at each intersection point
+          const bailoutEls: HTMLElement[] = []
+          for (const b of bailouts) {
+            const el = document.createElement('div')
+            el.textContent = '🛑'
+            el.style.cssText = 'font-size:24px;cursor:pointer;user-select:none;filter:drop-shadow(0 1px 3px rgba(0,0,0,0.55));'
+            const bailoutMi = (b.bailout_km * 0.621371).toFixed(1)
+            const savesMi   = (b.saves_km   * 0.621371).toFixed(1)
+            const nextSafe  = b.next_safe_name ?? 'end of route'
+            const destIcon  = b.destination_type === 'fire_station' ? '🚒'
+                            : b.destination_type === 'medical'      ? '🏥'
+                            : '🏘️'
+            new mapboxgl.Marker({ element: el })
+              .setLngLat([b.intersection_lng, b.intersection_lat])
+              .setPopup(new mapboxgl.Popup({ offset: 14 }).setHTML(
+                `<div style="font-family:monospace;font-size:11px;color:#fdb618;background:#011c24;padding:6px 10px;border-radius:3px;line-height:1.8">` +
+                `<strong style="font-size:12px">${destIcon} Bail out to ${b.destination_name}: ${bailoutMi} mi</strong><br>` +
+                `Saves ${savesMi} mi vs continuing to ${nextSafe}` +
+                `</div>`
+              ))
+              .addTo(map)
+            bailoutEls.push(el)
+          }
+          bailoutMarkersRef.current = bailoutEls
+        }
+
+        // ── Mobile coverage glow ───────────────────────────────────────────
+        // Rendered as two blurred layers *below* the route line so the glow
+        // halos out from behind it without obscuring the route itself.
+        const coverageSegs = result.coverage ?? []
+        if (coverageSegs.length > 1) {
+          const coverageFeatures = coverageSegs.map((seg, i, arr) => {
+            const fromKm  = i === 0 ? 0 : arr[i - 1].distance_km
+            const toKm    = seg.distance_km
+            const fromIdx = Math.floor(Math.min(fromKm / totalKm, 1) * (coords2d.length - 1))
+            const toIdx   = Math.min(Math.ceil(Math.min(toKm / totalKm, 1) * (coords2d.length - 1)), coords2d.length - 1)
+            return {
+              type: 'Feature' as const,
+              geometry: { type: 'LineString' as const, coordinates: coords2d.slice(fromIdx, toIdx + 1) },
+              properties: { color: COVERAGE_COLOR[seg.confidence] ?? '#444' },
+            }
+          })
+
+          map.addSource('coverage', {
+            type: 'geojson',
+            data: { type: 'FeatureCollection', features: coverageFeatures },
+          })
+
+          // Outer glow — wide, very soft
+          map.addLayer({
+            id:     'coverage-glow-outer',
+            type:   'line',
+            source: 'coverage',
+            layout: { 'line-join': 'round', 'line-cap': 'round' },
+            paint: {
+              'line-color':   ['get', 'color'],
+              'line-width':   22,
+              'line-opacity': 0.12,
+              'line-blur':    10,
+            },
+          }, 'route-line') // insert below route line
+
+          // Inner glow — tighter, slightly brighter
+          map.addLayer({
+            id:     'coverage-glow-inner',
+            type:   'line',
+            source: 'coverage',
+            layout: { 'line-join': 'round', 'line-cap': 'round' },
+            paint: {
+              'line-color':   ['get', 'color'],
+              'line-width':   12,
+              'line-opacity': 0.22,
+              'line-blur':    5,
+            },
+          }, 'route-line') // insert below route line
+        }
+
         // ── Start / End markers ────────────────────────────────────────────
         const startCoord = coords2d[0]
         const endCoord   = coords2d[coords2d.length - 1]
@@ -270,6 +380,29 @@ export default function RouteMap({ result, activeLayers, className }: RouteMapPr
           .setLngLat([endCoord[0], endCoord[1]])
           .setPopup(new mapboxgl.Popup().setHTML('<div style="font-family:monospace;font-size:12px">Finish</div>'))
           .addTo(map)
+
+        // ── Sync initial layer visibility to activeLayers state ────────────
+        // Layers are visible by default when added — apply the current toggle
+        // state so the map matches the UI buttons on first load.
+        const initLayers = activeLayersRef.current
+        const initLayerMap: Record<string, string[]> = {
+          'Route':        ['route-line'],
+          'Surface':      ['surface-line'],
+          'Weather':      ['weather-line'],
+          'Public Lands': ['lands-line'],
+          'Mobile Coverage': ['coverage-glow-outer', 'coverage-glow-inner'],
+          'Bailouts':        ['bailout-line'],
+        }
+        for (const [layer, ids] of Object.entries(initLayerMap)) {
+          const vis = initLayers.has(layer) ? 'visible' : 'none'
+          for (const id of ids) {
+            if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', vis)
+          }
+        }
+        const poiVis = initLayers.has('POIs') ? 'block' : 'none'
+        for (const el of poiMarkersRef.current) el.style.display = poiVis
+        const bailoutVis = initLayers.has('Bailouts') ? 'block' : 'none'
+        for (const el of bailoutMarkersRef.current) el.style.display = bailoutVis
       })
 
       mapRef.current = map
@@ -292,8 +425,8 @@ export default function RouteMap({ result, activeLayers, className }: RouteMapPr
       'Surface':      ['surface-line'],
       'Weather':      ['weather-line'],
       'Public Lands': ['lands-line'],
-      'Coverage':     [],
-      'POIs':         ['poi-circles'],
+      'Mobile Coverage': ['coverage-glow-outer', 'coverage-glow-inner'],
+      'Bailouts':        ['bailout-line'],
     }
 
     for (const [layer, ids] of Object.entries(layerMap)) {
@@ -304,7 +437,47 @@ export default function RouteMap({ result, activeLayers, className }: RouteMapPr
         }
       }
     }
+
+    // POI markers are HTML elements — toggle display directly
+    const poiDisplay = activeLayers.has('POIs') ? 'block' : 'none'
+    for (const el of poiMarkersRef.current) {
+      el.style.display = poiDisplay
+    }
+
+    // Bailout HTML markers — same pattern
+    const bailoutDisplay = activeLayers.has('Bailouts') ? 'block' : 'none'
+    for (const el of bailoutMarkersRef.current) {
+      el.style.display = bailoutDisplay
+    }
   }, [activeLayers])
+
+  // ── Live weather update ──────────────────────────────────────────────────
+  // When the parent re-derives weather segments (speed/start-time change),
+  // push new GeoJSON into the existing Mapbox source without reinitializing.
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map || !map.isStyleLoaded?.() || !weatherSegments) return
+    const source = map.getSource('weather')
+    if (!source) return
+
+    const coords    = (result.route.geometry.coordinates as [number, number, number?][]).map(c => [c[0], c[1]] as [number, number])
+    const totalKm   = result.route.distance_km
+
+    const features = weatherSegments.map((seg, i, arr) => {
+      const fromFrac = i === 0 ? 0 : arr[i - 1].distance_km / totalKm
+      const toFrac   = i === arr.length - 1 ? 1 : (arr[i].distance_km + (arr[i + 1]?.distance_km ?? totalKm)) / 2 / totalKm
+      const fromIdx  = Math.floor(Math.min(fromFrac, 1) * (coords.length - 1))
+      const toIdx    = Math.min(Math.ceil(Math.min(toFrac, 1) * (coords.length - 1)), coords.length - 1)
+      return {
+        type: 'Feature' as const,
+        geometry: { type: 'LineString' as const, coordinates: coords.slice(fromIdx, toIdx + 1) },
+        properties: { risk: seg.risk, color: WEATHER_COLOR[seg.risk] },
+      }
+    })
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ;(source as any).setData({ type: 'FeatureCollection', features })
+  }, [weatherSegments, result])
 
   return <div ref={containerRef} className={className} style={{ width: '100%', height: '100%' }} />
 }

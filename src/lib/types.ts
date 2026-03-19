@@ -31,9 +31,17 @@ export interface SurfaceStat {
   km: number
 }
 
+// Ordered surface segments along the route — used to color the elevation profile
+// in the correct positions. Derived from computeSurfaceStats.
+export interface SurfaceSegment {
+  from_km: number
+  to_km: number
+  type: SurfaceType
+}
+
 // ─── POIs ─────────────────────────────────────────────────────────────────────
 
-export type POIType = 'water' | 'shop' | 'bailout' | 'emergency' | 'shelter'
+export type POIType = 'water' | 'shop' | 'emergency' | 'shelter'
 
 export interface POI {
   id: string
@@ -53,20 +61,55 @@ export interface SupplyGap {
   description: string
 }
 
+// ─── Bailout Routes ───────────────────────────────────────────────────────────
+// A road that crosses the route and leads to safety in less distance than
+// continuing on the original route.
+
+export type BailoutDestinationType = 'town' | 'fire_station' | 'medical'
+
+export interface BailoutRoute {
+  id: string
+  intersection_lat: number
+  intersection_lng: number
+  distance_km: number          // position on original route
+  road_name?: string           // OSM name of the bailout road
+  destination_name: string     // nearest town/settlement or facility name
+  destination_type: BailoutDestinationType
+  destination_lat: number
+  destination_lng: number
+  bailout_km: number           // distance from intersection to safety via this road
+  route_remaining_km: number   // distance on original route to next safe point
+  next_safe_name?: string      // name of next safe point on original route
+  saves_km: number             // route_remaining_km − bailout_km (always positive)
+  road_geometry: [number, number][]  // [lng, lat][] from intersection toward destination
+}
+
 // ─── Weather ──────────────────────────────────────────────────────────────────
 
 export type WeatherRisk = 'green' | 'amber' | 'red'
 
-export interface WeatherSegment {
-  lat: number
-  lng: number
-  distance_km: number
+export interface HourlyPeriod {
+  start_time: string         // ISO-8601 local time
   temp_c: number
   wind_speed_kph: number
   wind_dir: string
   precipitation_chance: number
   description: string
   risk: WeatherRisk
+}
+
+export interface WeatherSegment {
+  lat: number
+  lng: number
+  distance_km: number
+  cumulative_gain_m: number  // elevation gain from start — used for Naismith arrival time
+  temp_c: number
+  wind_speed_kph: number
+  wind_dir: string
+  precipitation_chance: number
+  description: string
+  risk: WeatherRisk
+  hourly_forecast?: HourlyPeriod[]  // hourly periods for the ride day; enables client-side re-picking
 }
 
 export interface WeatherAlert {
@@ -83,6 +126,8 @@ export interface WeatherResult {
   segments: WeatherSegment[]
   alerts: WeatherAlert[]
   provider: 'nws' | 'open-meteo'
+  reference_speed_kph: number  // speed used at analysis time for initial period selection
+  ride_start_hour: number      // hour-of-day (0–23) used at analysis time
 }
 
 // ─── Public Lands ─────────────────────────────────────────────────────────────
@@ -124,8 +169,10 @@ export interface ReconResult {
   created_at: string
   route: CanonicalRoute
   surfaces: SurfaceStat[]
+  surface_segments: SurfaceSegment[]
   pois: POI[]
   supply_gaps: SupplyGap[]
+  bailouts: BailoutRoute[]
   weather: WeatherResult
   lands: LandCrossing[]
   coverage: CoverageSegment[]

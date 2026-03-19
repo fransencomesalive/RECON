@@ -52,20 +52,20 @@ export async function POST(req: Request) {
 
     const [osmResult, weatherResult, landsResult, coverageResult] = await Promise.allSettled([
       enrichFromOverpass(route),
-      enrichWeather(route.sample_points, route.bbox),
+      enrichWeather(route.sample_points, route.bbox, route.ride_date),
       enrichPublicLands(route),
       enrichCoverage(route.sample_points),
     ])
 
-    const { surfaces, pois, supply_gaps } =
+    const { surfaces, surface_segments, pois, supply_gaps, bailouts } =
       osmResult.status === 'fulfilled'
         ? osmResult.value
-        : (() => { errors['osm'] = osmResult.reason?.message ?? 'OSM enrichment failed'; return { surfaces: [], pois: [], supply_gaps: [] } })()
+        : (() => { errors['osm'] = osmResult.reason?.message ?? 'OSM enrichment failed'; return { surfaces: [], surface_segments: [], pois: [], supply_gaps: [], bailouts: [] } })()
 
     const weather =
       weatherResult.status === 'fulfilled'
         ? weatherResult.value
-        : (() => { errors['weather'] = weatherResult.reason?.message ?? 'Weather fetch failed'; return { segments: [], alerts: [], provider: 'nws' as const } })()
+        : (() => { errors['weather'] = weatherResult.reason?.message ?? 'Weather fetch failed'; return { segments: [], alerts: [], provider: 'nws' as const, reference_speed_kph: 16 / 0.621371, ride_start_hour: 9 } })()
 
     const lands =
       landsResult.status === 'fulfilled'
@@ -93,8 +93,10 @@ export async function POST(req: Request) {
       created_at: new Date().toISOString(),
       route,
       surfaces,
+      surface_segments,
       pois,
       supply_gaps,
+      bailouts,
       weather,
       lands,
       coverage,
