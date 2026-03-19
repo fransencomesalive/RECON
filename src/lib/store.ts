@@ -13,18 +13,21 @@ import type { ReconResult } from './types'
 
 const TTL_SECONDS = 60 * 60 * 24 * 7 // 7 days
 
-// In-memory fallback (local dev only — lost on server restart)
-const memStore = new Map<string, string>()
+// In-memory fallback for local dev. Anchored to globalThis so Next.js HMR
+// module re-evaluations don't create a fresh Map and lose stored results.
+const g = globalThis as typeof globalThis & { _reconMemStore?: Map<string, string> }
+if (!g._reconMemStore) g._reconMemStore = new Map<string, string>()
+const memStore = g._reconMemStore
 
 function isRedisConfigured(): boolean {
-  return !!(process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN)
+  return !!(process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN)
 }
 
 async function getRedis() {
   const { Redis } = await import('@upstash/redis')
   return new Redis({
-    url: process.env.UPSTASH_REDIS_REST_URL!,
-    token: process.env.UPSTASH_REDIS_REST_TOKEN!,
+    url: process.env.KV_REST_API_URL!,
+    token: process.env.KV_REST_API_TOKEN!,
   })
 }
 
