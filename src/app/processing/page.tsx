@@ -108,10 +108,18 @@ export default function ProcessingPage() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ file_data: fileData ?? undefined, file_name: fileName ?? undefined, url: routeUrl ?? undefined, ride_date: rideDate }),
     })
-      .then(r => r.json())
-      .then(data => {
+      .then(async r => {
+        const text = await r.text()
+        let data: { id?: string; error?: string }
+        try {
+          data = JSON.parse(text)
+        } catch {
+          throw new Error(r.status === 504 || r.status === 502
+            ? 'Analysis timed out. Try a shorter route or try again.'
+            : `Server error (${r.status}). Please try again.`)
+        }
         if (data.error) { setApiError(data.error); return }
-        resultIdRef.current = data.id
+        resultIdRef.current = data.id!
         // Clean up sessionStorage
         sessionStorage.removeItem('recon_file_data')
         sessionStorage.removeItem('recon_file_name')

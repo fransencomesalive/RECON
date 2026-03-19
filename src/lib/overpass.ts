@@ -16,7 +16,7 @@ function buildQuery(bbox: [number, number, number, number]): string {
   const b = `${s},${w},${n},${e}`
 
   return `
-[out:json][timeout:60];
+[out:json][timeout:5];
 (
   way["highway"]["surface"](${b});
   way["highway"]["tracktype"](${b});
@@ -202,7 +202,7 @@ async function fetchRoutedBailoutGeometry(b: BailoutRoute): Promise<BailoutRoute
       `https://api.mapbox.com/directions/v5/mapbox/cycling/` +
       `${b.intersection_lng},${b.intersection_lat};${b.destination_lng},${b.destination_lat}` +
       `?access_token=${token}&overview=full&geometries=geojson`
-    const res = await fetch(url, { signal: AbortSignal.timeout(8_000) })
+    const res = await fetch(url, { signal: AbortSignal.timeout(3_000) })
     if (!res.ok) {
       // HTTP error (not a routing failure) → keep with fallback
       return { ...b, road_geometry: [...b.road_geometry, [b.destination_lng, b.destination_lat]] }
@@ -576,7 +576,7 @@ export async function enrichFromOverpass(route: CanonicalRoute): Promise<{
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: `data=${encodeURIComponent(query)}`,
-    signal: AbortSignal.timeout(65_000),
+    signal: AbortSignal.timeout(6_000),
   })
 
   if (!res.ok) {

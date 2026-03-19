@@ -4,10 +4,11 @@ import { enrichFromOverpass } from '@/lib/overpass'
 import { enrichWeather } from '@/lib/nws'
 import { enrichPublicLands } from '@/lib/lands'
 import { enrichCoverage } from '@/lib/coverage'
+import { enrichMapillaryImagery } from '@/lib/mapillary'
 import { storeResult } from '@/lib/store'
 import type { ReconResult, AnalyzeRequest } from '@/lib/types'
 
-export const maxDuration = 60 // seconds — requires Vercel Pro for full 60s
+export const maxDuration = 10 // seconds — Vercel Hobby plan limit
 
 // ─── POST /api/analyze ────────────────────────────────────────────────────────
 
@@ -50,11 +51,12 @@ export async function POST(req: Request) {
     // ── 2. Fan out to data sources in parallel ──────────────────────────────
     const errors: Record<string, string> = {}
 
-    const [osmResult, weatherResult, landsResult, coverageResult] = await Promise.allSettled([
+    const [osmResult, weatherResult, landsResult, coverageResult, imageryResult] = await Promise.allSettled([
       enrichFromOverpass(route),
       enrichWeather(route.sample_points, route.bbox, route.ride_date),
       enrichPublicLands(route),
       enrichCoverage(route.sample_points),
+      enrichMapillaryImagery(route),
     ])
 
     const { surfaces, surface_segments, pois, supply_gaps, bailouts } =
@@ -76,6 +78,11 @@ export async function POST(req: Request) {
       coverageResult.status === 'fulfilled'
         ? coverageResult.value
         : (() => { errors['coverage'] = coverageResult.reason?.message ?? 'Coverage fetch failed'; return [] })()
+
+    const imagery =
+      imageryResult.status === 'fulfilled'
+        ? imageryResult.value
+        : (() => { errors['imagery'] = imageryResult.reason?.message ?? 'Imagery fetch failed'; return [] })()
 
     // ── 3. AI narrative (if Anthropic key is configured) ───────────────────
     let narrative = ''
@@ -100,7 +107,7 @@ export async function POST(req: Request) {
       weather,
       lands,
       coverage,
-      imagery: [],
+      imagery,
       narrative,
       errors,
     }

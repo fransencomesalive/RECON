@@ -73,7 +73,7 @@ export async function enrichPublicLands(route: CanonicalRoute): Promise<LandCros
   })
 
   const res = await fetch(`${ESRI_FEDERAL_LANDS}?${params}`, {
-    signal: AbortSignal.timeout(20_000),
+    signal: AbortSignal.timeout(4_000),
   })
 
   if (!res.ok) throw new Error(`Esri FeatureServer error: ${res.status}`)

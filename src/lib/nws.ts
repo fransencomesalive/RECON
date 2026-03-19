@@ -96,7 +96,7 @@ function periodToHourly(p: NwsForecastPeriod): HourlyPeriod {
 async function nwsFetch(url: string): Promise<Response> {
   const res = await fetch(url, {
     headers: { 'User-Agent': USER_AGENT, Accept: 'application/geo+json' },
-    signal: AbortSignal.timeout(15_000),
+    signal: AbortSignal.timeout(3_000),
   })
   if (!res.ok) throw new Error(`NWS ${res.status}: ${url}`)
   return res
@@ -218,7 +218,7 @@ export async function enrichWeather(
   const [minLng, minLat, maxLng, maxLat] = bbox
 
   // Limit to max 6 points to respect NWS rate limits
-  const MAX_POINTS = 6
+  const MAX_POINTS = 3
   const step   = Math.max(1, Math.floor(samplePoints.length / MAX_POINTS))
   const points = samplePoints.filter((_, i) => i % step === 0).slice(0, MAX_POINTS)
 
