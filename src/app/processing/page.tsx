@@ -85,7 +85,8 @@ export default function ProcessingPage() {
   const progressPathRef = useRef<SVGPathElement>(null)
 
   const [stageIndex, setStageIndex] = useState(0)
-  const [done, setDone]             = useState(false)
+  const [animDone, setAnimDone]     = useState(false) // animation finished
+  const [done, setDone]             = useState(false) // API returned, navigating
   const [apiError, setApiError]     = useState<string | null>(null)
   const resultIdRef = useRef<string | null>(null)
   const router = useRouter()
@@ -182,7 +183,7 @@ export default function ProcessingPage() {
     progressPath.style.strokeDasharray  = `${totalLength}`
     progressPath.style.strokeDashoffset = `${totalLength}`
 
-    const DURATION = 6000 // ms for full trace
+    const DURATION = 10000 // ms for full trace
     const start = performance.now()
     let raf: number
 
@@ -208,16 +209,17 @@ export default function ProcessingPage() {
       if (p < 1) {
         raf = requestAnimationFrame(animate)
       } else {
-        setDone(true)
+        setAnimDone(true)
         // Wait for API to finish (poll resultIdRef), then navigate
         const waitAndNavigate = () => {
           if (resultIdRef.current) {
-            router.push(`/results/${resultIdRef.current}`)
+            setDone(true)
+            setTimeout(() => router.push(`/results/${resultIdRef.current!}`), 800)
           } else if (!apiError) {
             setTimeout(waitAndNavigate, 300)
           }
         }
-        setTimeout(waitAndNavigate, 600)
+        setTimeout(waitAndNavigate, 200)
       }
     }
 
@@ -331,8 +333,8 @@ export default function ProcessingPage() {
           {/* Stage label */}
           <div className={styles.stageRow}>
             <span className={styles.stageIndicator} />
-            <span key={stageIndex} className={styles.stageLabel}>
-              {done ? 'Route analysis complete' : STAGES[stageIndex]}
+            <span key={`${stageIndex}-${animDone}-${done}`} className={styles.stageLabel}>
+              {done ? 'Route analysis complete' : animDone ? 'Finalizing dossier...' : STAGES[stageIndex]}
             </span>
           </div>
 
@@ -343,7 +345,7 @@ export default function ProcessingPage() {
                 key={i}
                 className={[
                   styles.stageDot,
-                  i < stageIndex ? styles.stageDotDone :
+                  animDone || i < stageIndex ? styles.stageDotDone :
                   i === stageIndex ? styles.stageDotActive : '',
                 ].join(' ')}
               />

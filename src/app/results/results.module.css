@@ -384,7 +384,7 @@
 /* ─── Elevation + Stats row ───────────────────────────────────────────────── */
 .elevStatsRow {
   display: grid;
-  grid-template-columns: 90fr 10fr;
+  grid-template-columns: 85fr 15fr;
   gap: 1.25rem;
   align-items: stretch;
 }
@@ -402,11 +402,11 @@
   flex-direction: column;
 }
 
-/* SVG grows to fill remaining card height after header and legend */
+/* SVG: natural aspect ratio — do NOT use flex: 1, it distorts emoji text */
 .elevCard .elevSvg {
-  flex: 1;
-  min-height: 120px;
+  width: 100%;
   height: auto;
+  min-height: 80px;
 }
 
 .statsPanel {
@@ -414,6 +414,28 @@
   flex-direction: column;
   gap: 0.75rem;
   min-width: 0;
+}
+
+/* ── Stats panel: override sizes for the narrow 10% column ── */
+.statsPanel .statCard {
+  padding: 0.75rem 0.6rem;
+}
+
+.statsPanel .statValue {
+  font-size: 0.85rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.statsPanel .rideControlLabel {
+  flex-direction: column;
+  align-items: flex-start;
+  white-space: normal;
+}
+
+.statsPanel .rideSlider {
+  width: 100%;
 }
 
 @media (max-width: 800px) {

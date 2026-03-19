@@ -365,6 +365,19 @@ export default function ResultsPage() {
     status: seg.risk,
   }))
 
+  // POI proximity filter: per lane, enforce ≥40 SVG units between markers
+  const MIN_POI_SPACING = 40 // SVG units
+  const chartPois = (() => {
+    const lastX: Record<string, number> = {}
+    return result.pois.filter(poi => {
+      const x = toX(poi.distance_km)
+      const lane = String(POI_LANE[poi.type] ?? 1)
+      if (lastX[lane] !== undefined && x - lastX[lane] < MIN_POI_SPACING) return false
+      lastX[lane] = x
+      return true
+    })
+  })()
+
   return (
     <main className={styles.root}>
       <canvas ref={bgRef}    className={styles.bgCanvas} />
@@ -460,7 +473,7 @@ export default function ResultsPage() {
               <span className={styles.sectionTitle}>Elevation Profile</span>
             </div>
 
-            <svg viewBox={`0 0 ${SVG_W} ${SVG_H}`} className={styles.elevSvg} preserveAspectRatio="none">
+            <svg viewBox={`0 0 ${SVG_W} ${SVG_H}`} className={styles.elevSvg}>
               <defs>
                 <pattern id="offRoadHatch" patternUnits="userSpaceOnUse" width="8" height="8" patternTransform="rotate(45)">
                   <line x1="0" y1="0" x2="0" y2="8" stroke="rgba(1,106,125,0.25)" strokeWidth="3" />
@@ -518,7 +531,7 @@ export default function ResultsPage() {
               })}
 
               {/* POI markers — staggered by type into 4 vertical lanes */}
-              {result.pois.map((poi, i) => {
+              {chartPois.map((poi, i) => {
                 const x  = toX(poi.distance_km)
                 const ey = poiLaneY(poi.type)
                 const color = POI_COLOR[poi.type] ?? '#aaa'
