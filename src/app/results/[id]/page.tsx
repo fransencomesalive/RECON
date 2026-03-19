@@ -95,7 +95,7 @@ function buildElevData(result: ReconResult): ElevPoint[] {
 
   return coords.map((c, i) => {
     const distKm = (i / (coords.length - 1)) * totalKm
-    const dist   = distKm * 0.621371  // km → miles for chart
+    const dist   = distKm  // stored in km; toX divides by route.distance_km
     const elev   = (c[2] ?? 0) * 3.28084  // m → ft
     return { dist, elev, surface: getSurface(distKm) }
   })
@@ -336,7 +336,7 @@ export default function ResultsPage() {
   const maxElev   = elevData.length ? Math.max(...elevData.map(p => p.elev)) : 1000
   const totalDist = unit === 'imperial' ? totalMi : route.distance_km
 
-  const toX = (dist: number) => CHART_L + (dist / (unit === 'imperial' ? totalMi : route.distance_km)) * (CHART_R - CHART_L)
+  const toX = (dist: number) => CHART_L + (dist / route.distance_km) * (CHART_R - CHART_L)
   const toY = (elev: number) => CHART_B - ((elev - minElev) / (maxElev - minElev || 1)) * (CHART_B - CHART_T)
 
   const surfaceGroups = groupBySurface(elevData)
@@ -519,7 +519,7 @@ export default function ResultsPage() {
 
               {/* POI markers — staggered by type into 4 vertical lanes */}
               {result.pois.map((poi, i) => {
-                const x  = toX(unit === 'imperial' ? poi.distance_km * 0.621371 : poi.distance_km)
+                const x  = toX(poi.distance_km)
                 const ey = poiLaneY(poi.type)
                 const color = POI_COLOR[poi.type] ?? '#aaa'
                 return (
