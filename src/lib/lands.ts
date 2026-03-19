@@ -8,11 +8,8 @@ const ESRI_FEDERAL_LANDS =
 
 interface EsriFeature {
   attributes: {
-    AREANAME?: string
-    NAME?: string
-    AREATYPENAME?: string
-    GIS_Acres?: number
-    Mng_Agency?: string
+    unit_name?: string
+    Agency?: string
     [key: string]: unknown
   }
 }
@@ -67,7 +64,7 @@ export async function enrichPublicLands(route: CanonicalRoute): Promise<LandCros
     inSR: '4326',
     outSR: '4326',
     spatialRel: 'esriSpatialRelIntersects',
-    outFields: 'AREANAME,NAME,AREATYPENAME,Mng_Agency',
+    outFields: 'unit_name,Agency',
     returnGeometry: 'false',
     f: 'json',
   })
@@ -89,7 +86,7 @@ export async function enrichPublicLands(route: CanonicalRoute): Promise<LandCros
   const crossings: LandCrossing[] = []
 
   for (const f of features) {
-    const name = f.attributes.AREANAME ?? f.attributes.NAME ?? 'Unknown Area'
+    const name = f.attributes.unit_name ?? 'Unknown Area'
     if (seen.has(name)) continue
     seen.add(name)
 
@@ -97,8 +94,8 @@ export async function enrichPublicLands(route: CanonicalRoute): Promise<LandCros
 
     crossings.push({
       name,
-      agency: normalizeAgency(f.attributes.Mng_Agency as string | undefined),
-      type: f.attributes.AREATYPENAME as string ?? 'Federal Land',
+      agency: normalizeAgency(f.attributes.Agency),
+      type: 'Federal Land',
       entry_km,
       exit_km,
     })
