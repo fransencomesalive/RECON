@@ -144,7 +144,10 @@ async function generateNarrative(data: {
   lands: ReconResult['lands']
 }): Promise<string> {
   const Anthropic = (await import('@anthropic-ai/sdk')).default
-  const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+  const client = new Anthropic({
+    apiKey: process.env.ANTHROPIC_API_KEY,
+    maxRetries: 0,  // no retries — we control timing with our own timeout
+  })
 
   const surfaceSummary = data.surfaces
     .map(s => `${s.pct}% ${s.type} (${s.km} km)`)
@@ -184,12 +187,19 @@ Land management: ${landSummary}
 
 Write from the perspective of an experienced route scout. Cover: terrain and surface character, weather considerations, resupply and water strategy, any bailout points or emergency access, and overall ride readiness. Be specific and actionable. Do not use bullet points or headers — flowing paragraphs only.`
 
-  const message = await client.messages.create({
-    model: 'claude-sonnet-4-6',
-    max_tokens: 600,
-    messages: [{ role: 'user', content: prompt }],
-  })
+  // Abort the request at the network level after 12s so our outer 15s race always wins
+  const controller = new AbortController()
+  const abortTimer = setTimeout(() => controller.abort(), 12_000)
+  let message
+  try {
+    message = await client.messages.create(
+      { model: 'claude-sonnet-4-6', max_tokens: 600, messages: [{ role: 'user', content: prompt }] },
+      { signal: controller.signal },
+    )
+  } finally {
+    clearTimeout(abortTimer)
+  }
 
-  const block = message.content[0]
+  const block = message!.content[0]
   return block.type === 'text' ? block.text : ''
 }
