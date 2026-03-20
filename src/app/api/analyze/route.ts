@@ -96,7 +96,7 @@ export async function POST(req: Request) {
       try {
         narrative = await Promise.race([
           generateNarrative({ route, surfaces, pois, supply_gaps, weather, lands }),
-          new Promise<string>((_, reject) => setTimeout(() => reject(new Error('narrative timeout')), 15_000)),
+          new Promise<string>((_, reject) => setTimeout(() => reject(new Error('narrative timeout')), 25_000)),
         ])
       } catch (e) {
         errors['narrative'] = (e as Error).message
@@ -185,7 +185,7 @@ Land management: ${landSummary}
 Write from the perspective of an experienced route scout. Cover: terrain and surface character, weather considerations, resupply and water strategy, any bailout points or emergency access, and overall ride readiness. Be specific and actionable. Do not use bullet points or headers — flowing paragraphs only.`
 
   const message = await client.messages.create({
-    model: 'claude-opus-4-6',
+    model: 'claude-sonnet-4-6',
     max_tokens: 600,
     messages: [{ role: 'user', content: prompt }],
   })

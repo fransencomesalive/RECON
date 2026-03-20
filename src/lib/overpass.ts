@@ -1,10 +1,51 @@
 import { v4 as uuidv4 } from 'uuid'
 import type { BailoutDestinationType, BailoutRoute, CanonicalRoute, POI, POIType, SurfaceStat, SurfaceSegment, SurfaceType, SupplyGap } from './types'
 
-const OVERPASS_MIRRORS = [
+// Public mirrors work from residential/Cloudflare IPs but are blocked by many cloud providers
+// (AWS/Vercel). If OVERPASS_PROXY_URL is set (a Cloudflare Worker proxy), it is used first.
+const PUBLIC_OVERPASS_MIRRORS = [
   'https://overpass.openstreetmap.fr/api/interpreter',
   'https://overpass-api.de/api/interpreter',
 ]
+
+function getOverpassMirrors(): string[] {
+  // If a Cloudflare Worker proxy URL is configured, use it — it won't be blocked from cloud IPs
+  const proxy = process.env.OVERPASS_PROXY_URL
+  return proxy ? [proxy, ...PUBLIC_OVERPASS_MIRRORS] : PUBLIC_OVERPASS_MIRRORS
+}
+
+// Fires all mirrors in parallel and resolves with the first successful response.
+// Parallel (vs sequential) cuts the failure wait from ~24 s to ~12 s when all mirrors time out.
+async function fetchFromAnyMirror(body: string): Promise<Response> {
+  const mirrors = getOverpassMirrors()
+  const MIRROR_TIMEOUT = 12_000
+
+  return new Promise((resolve, reject) => {
+    const errors: string[] = []
+    let pending = mirrors.length
+    let resolved = false
+
+    for (const mirror of mirrors) {
+      fetch(mirror, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body,
+        signal: AbortSignal.timeout(MIRROR_TIMEOUT),
+      }).then(r => {
+        if (resolved) return
+        if (r.ok) { resolved = true; resolve(r) }
+        else {
+          errors.push(`${mirror}: HTTP ${r.status}`)
+          if (--pending === 0) reject(new Error(`All Overpass mirrors failed: ${errors.join('; ')}`))
+        }
+      }).catch(e => {
+        if (resolved) return
+        errors.push(`${mirror}: ${(e as Error).message}`)
+        if (--pending === 0) reject(new Error(`All Overpass mirrors failed: ${errors.join('; ')}`))
+      })
+    }
+  })
+}
 const CORRIDOR_BUFFER_DEG = 0.02 // ~2 km buffer around bbox
 
 // ─── Overpass query builder ───────────────────────────────────────────────────
@@ -576,26 +617,7 @@ export async function enrichFromOverpass(route: CanonicalRoute): Promise<{
   const query = buildQuery(route.bbox)
   const body = `data=${encodeURIComponent(query)}`
 
-  let res: Response | null = null
-  let lastError = ''
-  for (const mirror of OVERPASS_MIRRORS) {
-    try {
-      const r = await fetch(mirror, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body,
-        signal: AbortSignal.timeout(12_000),
-      })
-      if (r.ok) { res = r; break }
-      lastError = `${r.status} ${r.statusText}`
-    } catch (e) {
-      lastError = (e as Error).message
-    }
-  }
-
-  if (!res) {
-    throw new Error(`Overpass API error: ${lastError}`)
-  }
+  const res = await fetchFromAnyMirror(body)
 
   const data: OverpassResponse = await res.json()
   const elements = data.elements ?? []
