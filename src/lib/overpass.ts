@@ -60,7 +60,7 @@ function buildQuery(bbox: [number, number, number, number]): string {
   const b = `${s},${w},${n},${e}`
 
   return `
-[out:json][timeout:20];
+[out:json][timeout:15];
 (
   way["highway"]["surface"](${b});
   way["highway"]["tracktype"](${b});
