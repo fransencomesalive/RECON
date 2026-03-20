@@ -51,12 +51,18 @@ export async function POST(req: Request) {
     // ── 2. Fan out to data sources in parallel ──────────────────────────────
     const errors: Record<string, string> = {}
 
+    // Top-level deadlines guarantee the function completes within maxDuration
+    // regardless of whether internal AbortSignals fire correctly.
+    const deadline = <T>(ms: number, promise: Promise<T>): Promise<T> =>
+      Promise.race([promise, new Promise<T>((_, reject) =>
+        setTimeout(() => reject(new Error(`timeout after ${ms}ms`)), ms))])
+
     const [osmResult, weatherResult, landsResult, coverageResult, imageryResult] = await Promise.allSettled([
-      enrichFromOverpass(route),
-      enrichWeather(route.sample_points, route.bbox, route.ride_date),
-      enrichPublicLands(route),
+      deadline(25_000, enrichFromOverpass(route)),
+      deadline(15_000, enrichWeather(route.sample_points, route.bbox, route.ride_date)),
+      deadline(12_000, enrichPublicLands(route)),
       enrichCoverage(route.sample_points),
-      enrichMapillaryImagery(route),
+      deadline(8_000,  enrichMapillaryImagery(route)),
     ])
 
     const { surfaces, surface_segments, pois, supply_gaps, bailouts } =
@@ -90,7 +96,7 @@ export async function POST(req: Request) {
       try {
         narrative = await Promise.race([
           generateNarrative({ route, surfaces, pois, supply_gaps, weather, lands }),
-          new Promise<string>((_, reject) => setTimeout(() => reject(new Error('narrative timeout')), 20_000)),
+          new Promise<string>((_, reject) => setTimeout(() => reject(new Error('narrative timeout')), 15_000)),
         ])
       } catch (e) {
         errors['narrative'] = (e as Error).message
