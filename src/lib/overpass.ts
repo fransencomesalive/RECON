@@ -1,15 +1,10 @@
 import { v4 as uuidv4 } from 'uuid'
 import type { BailoutDestinationType, BailoutRoute, CanonicalRoute, POI, POIType, SurfaceStat, SurfaceSegment, SurfaceType, SupplyGap } from './types'
 
-function getOverpassMirrors(): string[] {
-  const key = process.env.STADIA_API_KEY
-  if (key) return [`https://overpass.stadiamaps.com/api/interpreter?api_key=${key}`]
-  // Public fallbacks (may be rate-limited on cloud IPs)
-  return [
-    'https://overpass-api.de/api/interpreter',
-    'https://overpass.kumi.systems/api/interpreter',
-  ]
-}
+const OVERPASS_MIRRORS = [
+  'https://overpass.openstreetmap.fr/api/interpreter',
+  'https://overpass-api.de/api/interpreter',
+]
 const CORRIDOR_BUFFER_DEG = 0.02 // ~2 km buffer around bbox
 
 // ─── Overpass query builder ───────────────────────────────────────────────────
@@ -583,7 +578,7 @@ export async function enrichFromOverpass(route: CanonicalRoute): Promise<{
 
   let res: Response | null = null
   let lastError = ''
-  for (const mirror of getOverpassMirrors()) {
+  for (const mirror of OVERPASS_MIRRORS) {
     try {
       const r = await fetch(mirror, {
         method: 'POST',
