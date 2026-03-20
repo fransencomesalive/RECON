@@ -153,9 +153,12 @@ export default function ProcessingPage() {
 
     let cancelled = false
 
-    const post = (path: string, body: object) =>
-      fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
-        .then(r => r.json())
+    const post = async (path: string, body: object) => {
+      const r = await fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+      const text = await r.text()
+      try { return JSON.parse(text) }
+      catch { throw new Error(r.status === 504 || r.status === 502 ? 'Request timed out' : `Server error (${r.status})`) }
+    }
 
     const setStatus = (key: ServiceKey, status: ServiceStatus) =>
       setServices(s => ({ ...s, [key]: status }))
