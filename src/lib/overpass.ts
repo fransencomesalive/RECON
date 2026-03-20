@@ -11,6 +11,7 @@ const PUBLIC_OVERPASS_MIRRORS = [
 function getOverpassMirrors(): string[] {
   // If a Cloudflare Worker proxy URL is configured, use it — it won't be blocked from cloud IPs
   const proxy = process.env.OVERPASS_PROXY_URL
+  console.log('[overpass] OVERPASS_PROXY_URL:', proxy ?? '(not set)')
   return proxy ? [proxy, ...PUBLIC_OVERPASS_MIRRORS] : PUBLIC_OVERPASS_MIRRORS
 }
 
@@ -19,7 +20,7 @@ function getOverpassMirrors(): string[] {
 // does not fire reliably in Vercel's Node.js serverless runtime.
 async function fetchFromAnyMirror(body: string): Promise<Response> {
   const mirrors = getOverpassMirrors()
-  const MIRROR_TIMEOUT = 22_000
+  const MIRROR_TIMEOUT = 12_000
 
   console.log('[overpass] mirrors:', mirrors.map(m => m.replace(/^https?:\/\//, '')))
 
@@ -283,7 +284,7 @@ async function fetchRoutedBailoutGeometry(b: BailoutRoute): Promise<BailoutRoute
       `?access_token=${token}&overview=full&geometries=geojson`
     // AbortSignal.timeout is unreliable in Vercel Node.js — use explicit controller
     const controller = new AbortController()
-    const bailoutTimer = setTimeout(() => controller.abort(), 6_000)
+    const bailoutTimer = setTimeout(() => controller.abort(), 3_000)
     let res: Response
     try {
       res = await fetch(url, { signal: controller.signal })
@@ -338,7 +339,7 @@ async function detectBailoutRoutes(
   const MIN_SAVES_KM       = 3
   const MAX_TOWN_ABSOLUTE  = 120               // absolute ceiling regardless of route length
   const MIN_SPACING_KM     = 15
-  const MAX_BAILOUTS       = 5
+  const MAX_BAILOUTS       = 3
 
   const NAVIGABLE = new Set([
     'primary', 'secondary', 'tertiary', 'unclassified', 'residential', 'road', 'service', 'track',
@@ -648,6 +649,60 @@ interface OverpassResponse {
   elements: OsmElement[]
 }
 
+// ─── Segmented element fetch ──────────────────────────────────────────────────
+// Splits large routes into ~80 km segments and queries each bbox in parallel.
+// Smaller bboxes = less data per query = faster and more reliable on long routes.
+
+async function fetchAllElements(route: CanonicalRoute): Promise<OsmElement[]> {
+  const coords = route.geometry.coordinates
+  const SEGMENT_MAX_KM = 80
+  const numSegments = Math.max(1, Math.ceil(route.distance_km / SEGMENT_MAX_KM))
+
+  console.log(`[overpass] ${route.distance_km.toFixed(0)} km → ${numSegments} segment(s)`)
+
+  if (numSegments === 1) {
+    const res = await fetchFromAnyMirror(`data=${encodeURIComponent(buildQuery(route.bbox))}`)
+    let data: OverpassResponse
+    try { data = await res.json() }
+    catch { throw new Error('Overpass returned non-JSON response') }
+    return data.elements ?? []
+  }
+
+  // Split coords into segments with a small overlap at boundaries
+  const segSize = Math.ceil(coords.length / numSegments)
+  const bboxes: [number, number, number, number][] = []
+  for (let i = 0; i < numSegments; i++) {
+    const chunk = coords.slice(i * segSize, Math.min(coords.length, (i + 1) * segSize + 10))
+    const lngs = chunk.map(c => c[0])
+    const lats = chunk.map(c => c[1])
+    bboxes.push([Math.min(...lngs), Math.min(...lats), Math.max(...lngs), Math.max(...lats)])
+  }
+
+  const results = await Promise.allSettled(
+    bboxes.map(async bbox => {
+      const res = await fetchFromAnyMirror(`data=${encodeURIComponent(buildQuery(bbox))}`)
+      let data: OverpassResponse
+      try { data = await res.json() }
+      catch { throw new Error('Overpass returned non-JSON response') }
+      return data.elements ?? []
+    })
+  )
+
+  const elementMap = new Map<number, OsmElement>()
+  let ok = 0
+  for (const r of results) {
+    if (r.status === 'fulfilled') {
+      ok++
+      for (const el of r.value) elementMap.set(el.id, el)
+    } else {
+      console.warn('[overpass] segment failed:', (r.reason as Error).message)
+    }
+  }
+  if (ok === 0) throw new Error('All Overpass segments failed')
+  console.log(`[overpass] ${ok}/${numSegments} segments OK, ${elementMap.size} elements`)
+  return Array.from(elementMap.values())
+}
+
 // ─── Main export ──────────────────────────────────────────────────────────────
 
 export async function enrichFromOverpass(route: CanonicalRoute): Promise<{
@@ -657,18 +712,7 @@ export async function enrichFromOverpass(route: CanonicalRoute): Promise<{
   supply_gaps: SupplyGap[]
   bailouts: BailoutRoute[]
 }> {
-  const query = buildQuery(route.bbox)
-  const body = `data=${encodeURIComponent(query)}`
-
-  const res = await fetchFromAnyMirror(body)
-
-  let data: OverpassResponse
-  try {
-    data = await res.json()
-  } catch {
-    throw new Error('Overpass returned non-JSON response — mirror may be down or rate-limiting')
-  }
-  const elements = data.elements ?? []
+  const elements = await fetchAllElements(route)
 
   const ways = elements.filter(e => e.type === 'way')
   const nodes = elements.filter(e => e.type === 'node' && e.lat != null && e.lon != null)

@@ -2,7 +2,7 @@ import { getRoute } from '@/lib/store'
 import { enrichFromOverpass } from '@/lib/overpass'
 import type { EnrichRequest } from '@/lib/types'
 
-export const maxDuration = 30
+export const maxDuration = 60
 
 export async function POST(req: Request) {
   try {
@@ -15,7 +15,7 @@ export async function POST(req: Request) {
     const result = await Promise.race([
       enrichFromOverpass(route),
       new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error('OSM timeout')), 28_000)),
+        setTimeout(() => reject(new Error('OSM timeout')), 55_000)),
     ])
 
     return Response.json(result)
