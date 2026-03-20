@@ -320,7 +320,7 @@ export default function RouteMap({ result, activeLayers, weatherSegments, classN
         // Rendered as two blurred layers *below* the route line so the glow
         // halos out from behind it without obscuring the route itself.
         const coverageSegs = result.coverage ?? []
-        if (coverageSegs.length > 1) {
+        if (coverageSegs.length > 0) {
           const coverageFeatures = coverageSegs.map((seg, i, arr) => {
             const fromKm  = i === 0 ? 0 : arr[i - 1].distance_km
             const toKm    = seg.distance_km
