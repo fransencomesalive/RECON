@@ -662,7 +662,12 @@ export async function enrichFromOverpass(route: CanonicalRoute): Promise<{
 
   const res = await fetchFromAnyMirror(body)
 
-  const data: OverpassResponse = await res.json()
+  let data: OverpassResponse
+  try {
+    data = await res.json()
+  } catch {
+    throw new Error('Overpass returned non-JSON response — mirror may be down or rate-limiting')
+  }
   const elements = data.elements ?? []
 
   const ways = elements.filter(e => e.type === 'way')
