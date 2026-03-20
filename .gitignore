@@ -45,3 +45,4 @@ next-env.d.ts
 RECON_v1_*/
 RECON_v1_*.csv
 favicon.png
+.next/recon-dev-store

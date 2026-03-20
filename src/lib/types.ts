@@ -194,3 +194,37 @@ export interface AnalyzeResponse {
   id: string
   error?: string
 }
+
+// ─── Client-orchestrated enrichment API ───────────────────────────────────────
+
+export interface EnrichRequest {
+  id: string
+}
+
+export interface OsmEnrichResult {
+  surfaces: SurfaceStat[]
+  surface_segments: SurfaceSegment[]
+  pois: POI[]
+  supply_gaps: SupplyGap[]
+  bailouts: BailoutRoute[]
+}
+
+export interface NarrativeRequest {
+  id: string
+  surfaces: SurfaceStat[]
+  pois: POI[]
+  supply_gaps: SupplyGap[]
+  weather: WeatherResult
+  lands: LandCrossing[]
+}
+
+export interface FinalizeRequest {
+  id: string
+  osm: OsmEnrichResult
+  weather: WeatherResult
+  lands: LandCrossing[]
+  coverage: CoverageSegment[]
+  imagery: RouteImage[]
+  narrative: string
+  errors: Record<string, string>
+}

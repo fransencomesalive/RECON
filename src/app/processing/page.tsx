@@ -4,6 +4,12 @@ import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import styles from './processing.module.css'
+import type {
+  OsmEnrichResult,
+  WeatherResult,
+  LandCrossing,
+  CoverageSegment,
+} from '@/lib/types'
 
 // ─── Mesh gradient (shared with intake) ──────────────────────────────────────
 
@@ -42,21 +48,7 @@ function drawMesh(ctx: CanvasRenderingContext2D, nodes: MeshNode[], W: number, H
   })
 }
 
-// ─── Processing stages ────────────────────────────────────────────────────────
-
-const STAGES = [
-  'Parsing route geometry',
-  'Fetching weather data',
-  'Checking public lands',
-  'Scanning OSM surfaces & POIs',
-  'Checking cell coverage',
-  'Compiling dossier',
-]
-
-// Each stage occupies a fraction of total progress
-const STAGE_BREAKPOINTS = [0, 0.12, 0.28, 0.48, 0.68, 0.84, 1.0]
-
-// ─── Route SVG path (designed to read as a real cycling route) ────────────────
+// ─── Route SVG path ───────────────────────────────────────────────────────────
 
 const ROUTE_D = `
   M 30,230
@@ -75,28 +67,51 @@ const ROUTE_D = `
   C 696,256 672,252 650,258
 `
 
+// ─── Service definitions ──────────────────────────────────────────────────────
+
+type ServiceKey = 'osm' | 'weather' | 'lands' | 'coverage'
+type ServiceStatus = 'pending' | 'loading' | 'done' | 'error'
+type NarrativeStatus = 'hidden' | 'pending' | 'loading' | 'done' | 'error'
+
+const SERVICES: { key: ServiceKey; label: string }[] = [
+  { key: 'osm',      label: 'TERRAIN & INFRASTRUCTURE' },
+  { key: 'weather',  label: 'WEATHER CONDITIONS' },
+  { key: 'lands',    label: 'PUBLIC LAND CROSSINGS' },
+  { key: 'coverage', label: 'CELL COVERAGE' },
+]
+
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function ProcessingPage() {
-  const bgRef     = useRef<HTMLCanvasElement>(null)
-  const grainRef  = useRef<HTMLCanvasElement>(null)
-  const routeRef  = useRef<SVGPathElement>(null)
-  const dotRef    = useRef<SVGCircleElement>(null)
+  const bgRef          = useRef<HTMLCanvasElement>(null)
+  const grainRef       = useRef<HTMLCanvasElement>(null)
+  const routeRef       = useRef<SVGPathElement>(null)
+  const dotRef         = useRef<SVGCircleElement>(null)
   const progressPathRef = useRef<SVGPathElement>(null)
 
-  const [stageIndex, setStageIndex] = useState(0)
-  const [animDone, setAnimDone]     = useState(false) // animation finished
-  const [done, setDone]             = useState(false) // API returned, navigating
-  const [apiError, setApiError]     = useState<string | null>(null)
-  const resultIdRef = useRef<string | null>(null)
+  const [analyzeId, setAnalyzeId]         = useState<string | null>(null)
+  const [services, setServices]           = useState<Record<ServiceKey, ServiceStatus>>({
+    osm: 'pending', weather: 'pending', lands: 'pending', coverage: 'pending',
+  })
+  const [narrativeStatus, setNarrativeStatus] = useState<NarrativeStatus>('hidden')
+  const [apiError, setApiError]           = useState<string | null>(null)
+
+  // Enrichment data stored in refs — only needed at finalize time
+  const osmRef      = useRef<OsmEnrichResult | null>(null)
+  const weatherRef  = useRef<WeatherResult | null>(null)
+  const landsRef    = useRef<LandCrossing[] | null>(null)
+  const coverageRef = useRef<CoverageSegment[] | null>(null)
+  const narrativeRef = useRef<string>('')
+  const errorsRef   = useRef<Record<string, string>>({})
+
   const router = useRouter()
 
-  // ── Call /api/analyze in the background ─────────────────────────────────────
+  // ── Step 1: parse route ─────────────────────────────────────────────────────
   useEffect(() => {
-    const fileData  = sessionStorage.getItem('recon_file_data')
-    const fileName  = sessionStorage.getItem('recon_file_name')
-    const rideDate  = sessionStorage.getItem('recon_ride_date') ?? new Date().toISOString().split('T')[0]
-    const routeUrl  = sessionStorage.getItem('recon_route_url')
+    const fileData = sessionStorage.getItem('recon_file_data')
+    const fileName = sessionStorage.getItem('recon_file_name')
+    const rideDate = sessionStorage.getItem('recon_ride_date') ?? new Date().toISOString().split('T')[0]
+    const routeUrl = sessionStorage.getItem('recon_route_url')
 
     if (!fileData && !routeUrl) {
       setApiError('No route data found. Please go back and upload a file.')
@@ -106,28 +121,132 @@ export default function ProcessingPage() {
     fetch('/api/analyze', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ file_data: fileData ?? undefined, file_name: fileName ?? undefined, url: routeUrl ?? undefined, ride_date: rideDate }),
+      body: JSON.stringify({
+        file_data: fileData ?? undefined,
+        file_name: fileName ?? undefined,
+        url: routeUrl ?? undefined,
+        ride_date: rideDate,
+      }),
     })
       .then(async r => {
         const text = await r.text()
         let data: { id?: string; error?: string }
-        try {
-          data = JSON.parse(text)
-        } catch {
+        try { data = JSON.parse(text) }
+        catch {
           throw new Error(r.status === 504 || r.status === 502
             ? 'Analysis timed out. Try a shorter route or try again.'
             : `Server error (${r.status}). Please try again.`)
         }
         if (data.error) { setApiError(data.error); return }
-        resultIdRef.current = data.id!
-        // Clean up sessionStorage
         sessionStorage.removeItem('recon_file_data')
         sessionStorage.removeItem('recon_file_name')
         sessionStorage.removeItem('recon_route_url')
+        setAnalyzeId(data.id!)
       })
       .catch(err => setApiError(err.message ?? 'Analysis failed.'))
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // ── Step 2: fire enrichments when id is ready ───────────────────────────────
+  useEffect(() => {
+    if (!analyzeId) return
+
+    let cancelled = false
+
+    const post = (path: string, body: object) =>
+      fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+        .then(r => r.json())
+
+    const setStatus = (key: ServiceKey, status: ServiceStatus) =>
+      setServices(s => ({ ...s, [key]: status }))
+
+    const run = async () => {
+      setServices({ osm: 'loading', weather: 'loading', lands: 'loading', coverage: 'loading' })
+
+      // Fire OSM, weather, lands, coverage in parallel; track each individually
+      const osmP = post('/api/enrich/osm', { id: analyzeId })
+        .then(data => {
+          if (cancelled) return
+          if (data.error) { errorsRef.current.osm = data.error; setStatus('osm', 'error') }
+          else { osmRef.current = data; setStatus('osm', 'done') }
+        })
+        .catch(e => { if (!cancelled) { errorsRef.current.osm = e.message; setStatus('osm', 'error') } })
+
+      const weatherP = post('/api/enrich/weather', { id: analyzeId })
+        .then(data => {
+          if (cancelled) return
+          if (data.error) { errorsRef.current.weather = data.error; setStatus('weather', 'error') }
+          else { weatherRef.current = data; setStatus('weather', 'done') }
+        })
+        .catch(e => { if (!cancelled) { errorsRef.current.weather = e.message; setStatus('weather', 'error') } })
+
+      const landsP = post('/api/enrich/lands', { id: analyzeId })
+        .then(data => {
+          if (cancelled) return
+          if (data.error) { errorsRef.current.lands = data.error; setStatus('lands', 'error') }
+          else { landsRef.current = data; setStatus('lands', 'done') }
+        })
+        .catch(e => { if (!cancelled) { errorsRef.current.lands = e.message; setStatus('lands', 'error') } })
+
+      const coverageP = post('/api/enrich/coverage', { id: analyzeId })
+        .then(data => {
+          if (cancelled) return
+          if (data.error) { errorsRef.current.coverage = data.error; setStatus('coverage', 'error') }
+          else { coverageRef.current = data; setStatus('coverage', 'done') }
+        })
+        .catch(e => { if (!cancelled) { errorsRef.current.coverage = e.message; setStatus('coverage', 'error') } })
+
+      // Narrative waits for OSM + weather + lands
+      await Promise.allSettled([osmP, weatherP, landsP])
+      if (cancelled) return
+
+      setNarrativeStatus('loading')
+      const defaultWeather: WeatherResult = {
+        segments: [], alerts: [], provider: 'nws', reference_speed_kph: 25.75, ride_start_hour: 9,
+      }
+      await post('/api/enrich/narrative', {
+        id: analyzeId,
+        surfaces:     osmRef.current?.surfaces     ?? [],
+        pois:         osmRef.current?.pois         ?? [],
+        supply_gaps:  osmRef.current?.supply_gaps  ?? [],
+        weather:      weatherRef.current           ?? defaultWeather,
+        lands:        landsRef.current             ?? [],
+      })
+        .then(data => {
+          if (cancelled) return
+          if (data.error) { errorsRef.current.narrative = data.error; setNarrativeStatus('error') }
+          else { narrativeRef.current = data.narrative ?? ''; setNarrativeStatus('done') }
+        })
+        .catch(e => { if (!cancelled) { errorsRef.current.narrative = e.message; setNarrativeStatus('error') } })
+
+      // Wait for coverage before finalizing
+      await coverageP
+      if (cancelled) return
+
+      // Finalize
+      const defaultOsm: OsmEnrichResult = { surfaces: [], surface_segments: [], pois: [], supply_gaps: [], bailouts: [] }
+      post('/api/results/finalize', {
+        id: analyzeId,
+        osm:       osmRef.current      ?? defaultOsm,
+        weather:   weatherRef.current  ?? defaultWeather,
+        lands:     landsRef.current    ?? [],
+        coverage:  coverageRef.current ?? [],
+        imagery:   [],
+        narrative: narrativeRef.current,
+        errors:    errorsRef.current,
+      })
+        .then(data => {
+          if (cancelled) return
+          if (data.error) { setApiError(data.error); return }
+          router.push(`/results/${data.id}`)
+        })
+        .catch(e => { if (!cancelled) setApiError(e.message ?? 'Failed to save result.') })
+    }
+
+    run().catch(e => { if (!cancelled) setApiError((e as Error).message) })
+    return () => { cancelled = true }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [analyzeId])
 
   // ── Mesh gradient ───────────────────────────────────────────────────────────
   useEffect(() => {
@@ -174,7 +293,7 @@ export default function ProcessingPage() {
     return () => { window.removeEventListener('resize', resize); cancelAnimationFrame(raf) }
   }, [])
 
-  // ── Route trace animation ───────────────────────────────────────────────────
+  // ── Route trace animation (loops) ──────────────────────────────────────────
   useEffect(() => {
     const path         = routeRef.current
     const progressPath = progressPathRef.current
@@ -182,64 +301,37 @@ export default function ProcessingPage() {
     if (!path || !progressPath || !dot) return
 
     const totalLength = path.getTotalLength()
-
-    // Set up amber base path
     path.style.strokeDasharray  = `${totalLength}`
     path.style.strokeDashoffset = '0'
-
-    // Set up red progress path — starts fully hidden
     progressPath.style.strokeDasharray  = `${totalLength}`
     progressPath.style.strokeDashoffset = `${totalLength}`
 
-    const DURATION = 10000 // ms for full trace
-    const start = performance.now()
+    const DURATION = 9000
+    let start = performance.now()
     let raf: number
 
     const animate = (now: number) => {
-      const elapsed = now - start
-      const p = Math.min(elapsed / DURATION, 1)
-
-      // Advance red line
+      const p = Math.min((now - start) / DURATION, 1)
       const drawn = totalLength * p
       progressPath.style.strokeDashoffset = `${totalLength - drawn}`
-
-      // Move dot to current progress point
       const pt = path.getPointAtLength(drawn)
       dot.setAttribute('cx', String(pt.x))
       dot.setAttribute('cy', String(pt.y))
-
-      // Update stage
-      const si = STAGE_BREAKPOINTS.findIndex((bp, i) =>
-        p >= bp && p < (STAGE_BREAKPOINTS[i + 1] ?? 2)
-      )
-      setStageIndex(Math.max(0, si))
-
-      if (p < 1) {
-        raf = requestAnimationFrame(animate)
-      } else {
-        setAnimDone(true)
-        // Wait for API to finish (poll resultIdRef), then navigate
-        const waitAndNavigate = () => {
-          if (resultIdRef.current) {
-            setDone(true)
-            setTimeout(() => router.push(`/results/${resultIdRef.current!}`), 800)
-          } else if (!apiError) {
-            setTimeout(waitAndNavigate, 300)
-          }
-        }
-        setTimeout(waitAndNavigate, 200)
+      if (p >= 1) {
+        // Loop: pause briefly, then restart
+        setTimeout(() => {
+          progressPath.style.strokeDashoffset = `${totalLength}`
+          start = performance.now() + 400
+        }, 600)
       }
+      raf = requestAnimationFrame(animate)
     }
 
-    // Brief pause so amber path is visible before red starts
-    const timer = setTimeout(() => {
-      raf = requestAnimationFrame(animate)
-    }, 500)
-
+    const timer = setTimeout(() => { raf = requestAnimationFrame(animate) }, 400)
     return () => { clearTimeout(timer); cancelAnimationFrame(raf) }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [router])
+  }, [])
 
+  // ── Error UI ────────────────────────────────────────────────────────────────
   if (apiError) {
     const isStravaError = apiError === 'STRAVA_AUTH_REQUIRED'
     return (
@@ -294,6 +386,7 @@ export default function ProcessingPage() {
         </header>
 
         <div className={styles.card}>
+          {/* Route trace animation */}
           <svg
             className={styles.routeSvg}
             viewBox="0 0 720 280"
@@ -301,64 +394,79 @@ export default function ProcessingPage() {
             xmlns="http://www.w3.org/2000/svg"
             preserveAspectRatio="xMidYMid meet"
           >
-            {/* Start marker */}
-            <circle cx="30" cy="230" r="5" fill="#fdb618" opacity="0.7" />
-            {/* End marker */}
+            <circle cx="30"  cy="230" r="5" fill="#fdb618" opacity="0.7" />
             <circle cx="650" cy="258" r="5" fill="#fdb618" opacity="0.7" />
-
-            {/* Amber base route */}
-            <path
-              ref={routeRef}
-              d={ROUTE_D}
-              stroke="#fdb618"
-              strokeWidth="3"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              opacity="0.45"
-            />
-
-            {/* Red progress route */}
-            <path
-              ref={progressPathRef}
-              d={ROUTE_D}
-              stroke="#ed1c24"
-              strokeWidth="3"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-
-            {/* Moving dot at progress head */}
-            <circle
-              ref={dotRef}
-              cx="30"
-              cy="230"
-              r="5"
-              fill="#ed1c24"
-              className={styles.dot}
-            />
+            <path ref={routeRef} d={ROUTE_D} stroke="#fdb618" strokeWidth="3"
+              strokeLinecap="round" strokeLinejoin="round" opacity="0.4" />
+            <path ref={progressPathRef} d={ROUTE_D} stroke="#ed1c24" strokeWidth="3"
+              strokeLinecap="round" strokeLinejoin="round" />
+            <circle ref={dotRef} cx="30" cy="230" r="5" fill="#ed1c24" className={styles.dot} />
           </svg>
 
-          {/* Stage label */}
-          <div className={styles.stageRow}>
-            <span className={styles.stageIndicator} />
-            <span key={`${stageIndex}-${animDone}-${done}`} className={styles.stageLabel}>
-              {done ? 'Route analysis complete' : animDone ? 'Finalizing dossier...' : STAGES[stageIndex]}
-            </span>
+          <div className={styles.divider} />
+
+          {/* Service status rows */}
+          <div className={styles.serviceList}>
+            {SERVICES.map(({ key, label }) => {
+              const status = services[key]
+              return (
+                <div key={key} className={styles.serviceRow}>
+                  <div className={styles.serviceRowHead}>
+                    <span className={[
+                      styles.serviceDot,
+                      status === 'loading' ? styles.serviceDotLoading :
+                      status === 'done'    ? styles.serviceDotDone :
+                      status === 'error'   ? styles.serviceDotError : '',
+                    ].join(' ')} />
+                    <span className={[
+                      styles.serviceLabel,
+                      status === 'done' || status === 'error' ? styles.serviceLabelMuted : '',
+                    ].join(' ')}>
+                      {label}
+                    </span>
+                  </div>
+                  <div className={[
+                    styles.serviceBar,
+                    status === 'loading' ? styles.serviceBarLoading :
+                    status === 'done'    ? styles.serviceBarDone :
+                    status === 'error'   ? styles.serviceBarError : '',
+                  ].join(' ')} />
+                </div>
+              )
+            })}
           </div>
 
-          {/* Stage progress dots */}
-          <div className={styles.stageDots}>
-            {STAGES.map((_, i) => (
-              <span
-                key={i}
-                className={[
-                  styles.stageDot,
-                  animDone || i < stageIndex ? styles.stageDotDone :
-                  i === stageIndex ? styles.stageDotActive : '',
-                ].join(' ')}
-              />
-            ))}
-          </div>
+          {/* Narrative row — appears when deps complete */}
+          {narrativeStatus !== 'hidden' && (
+            <>
+              <div className={styles.divider} />
+              <div className={styles.narrativeRow}>
+                <div className={styles.serviceRowHead}>
+                  <span className={[
+                    styles.narrativeDot,
+                    narrativeStatus === 'loading' ? styles.narrativeDotLoading :
+                    narrativeStatus === 'done'    ? styles.narrativeDotDone :
+                    narrativeStatus === 'error'   ? styles.serviceDotError : '',
+                  ].join(' ')} />
+                  <span className={styles.narrativeLabel}>
+                    {narrativeStatus === 'done'  ? 'ROUTE INTELLIGENCE COMPILED' :
+                     narrativeStatus === 'error' ? 'NARRATIVE UNAVAILABLE' :
+                     'GENERATING ROUTE INTELLIGENCE'}
+                  </span>
+                  {narrativeStatus === 'loading' && (
+                    <span className={styles.narrativeDots} aria-hidden>...</span>
+                  )}
+                </div>
+                <div className={[
+                  styles.serviceBar,
+                  narrativeStatus === 'loading' ? styles.narrativeBarLoading :
+                  narrativeStatus === 'done'    ? styles.narrativeBarDone :
+                  narrativeStatus === 'error'   ? styles.serviceBarError :
+                  styles.narrativeBarPending,
+                ].join(' ')} />
+              </div>
+            </>
+          )}
         </div>
 
       </div>

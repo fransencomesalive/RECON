@@ -90,20 +90,39 @@
   to   { r: 7; opacity: 0.6; }
 }
 
-/* ─── Stage label ─────────────────────────────────────────────────────────── */
-.stageRow {
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
+/* ─── Divider ─────────────────────────────────────────────────────────────── */
+.divider {
+  width: 100%;
+  height: 1px;
+  background: rgba(0, 0, 0, 0.12);
 }
 
-.stageIndicator {
+/* ─── Service list ────────────────────────────────────────────────────────── */
+.serviceList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.serviceRow {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.serviceRowHead {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+}
+
+.serviceDot {
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: #ed1c24;
+  background: rgba(0, 0, 0, 0.18);
   flex-shrink: 0;
-  animation: blink 1s step-start infinite;
+  transition: background 0.3s, box-shadow 0.3s;
 }
 
 @keyframes blink {
@@ -111,12 +130,98 @@
   50%       { opacity: 0; }
 }
 
-.stageLabel {
+.serviceDotLoading {
+  background: #ed1c24;
+  box-shadow: 0 0 5px #ed1c24;
+  animation: blink 1s step-start infinite;
+}
+
+.serviceDotDone {
+  background: #fdb618;
+}
+
+.serviceDotError {
+  background: #ed1c24;
+}
+
+.serviceLabel {
   font-family: var(--font-geist-mono, monospace);
-  font-size: 0.8rem;
-  letter-spacing: 0.08em;
-  color: #111;
-  animation: fadeIn 0.3s ease;
+  font-size: 0.68rem;
+  letter-spacing: 0.1em;
+  color: rgba(0, 0, 0, 0.8);
+  transition: color 0.4s;
+}
+
+.serviceLabelMuted {
+  color: rgba(0, 0, 0, 0.4);
+}
+
+/* ─── Progress bars ───────────────────────────────────────────────────────── */
+.serviceBar {
+  height: 3px;
+  border-radius: 2px;
+  background: rgba(0, 0, 0, 0.08);
+  margin-left: 11px;
+  overflow: hidden;
+  position: relative;
+}
+
+@keyframes shimmer {
+  0%   { background-position: 200% center; }
+  100% { background-position: -100% center; }
+}
+
+.serviceBarLoading {
+  background: linear-gradient(
+    90deg,
+    rgba(237, 28, 36, 0.15) 0%,
+    #ed1c24 40%,
+    rgba(237, 28, 36, 0.15) 80%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.6s linear infinite;
+}
+
+.serviceBarDone {
+  background: #fdb618;
+  transition: background 0.3s;
+}
+
+.serviceBarError {
+  background: #ed1c24cc;
+}
+
+/* ─── Narrative section ───────────────────────────────────────────────────── */
+.narrativeRow {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.narrativeDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: rgba(0, 170, 201, 0.25);
+  flex-shrink: 0;
+  transition: background 0.3s;
+}
+
+.narrativeDotLoading {
+  background: #00aac9;
+  box-shadow: 0 0 6px #00aac9cc;
+  animation: blink 1s step-start infinite;
+}
+
+.narrativeDotDone {
+  background: #fdb618;
+}
+
+.narrativeLabel {
+  font-family: var(--font-geist-mono, monospace);
+  font-size: 0.68rem;
+  letter-spacing: 0.1em;
+  color: rgba(0, 0, 0, 0.75);
 }
 
 @keyframes fadeIn {
@@ -124,27 +229,37 @@
   to   { opacity: 1; transform: translateY(0); }
 }
 
-/* ─── Stage progress dots ─────────────────────────────────────────────────── */
-.stageDots {
-  display: flex;
-  gap: 0.4rem;
-  align-items: center;
+.narrativeDots {
+  font-family: var(--font-geist-mono, monospace);
+  font-size: 0.68rem;
+  color: #00aac9;
+  animation: fadeIn 0.3s ease;
+  margin-left: 0.15rem;
 }
 
-.stageDot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: rgba(0, 0, 0, 0.15);
-  transition: background 0.3s;
-  flex-shrink: 0;
+.narrativeBarPending {
+  background: rgba(0, 170, 201, 0.12);
+  margin-left: 13px;
 }
 
-.stageDotDone {
+@keyframes shimmerCyan {
+  0%   { background-position: 200% center; }
+  100% { background-position: -100% center; }
+}
+
+.narrativeBarLoading {
+  background: linear-gradient(
+    90deg,
+    rgba(0, 170, 201, 0.12) 0%,
+    #00aac9 40%,
+    rgba(0, 170, 201, 0.12) 80%
+  );
+  background-size: 200% 100%;
+  animation: shimmerCyan 1.8s linear infinite;
+  margin-left: 13px;
+}
+
+.narrativeBarDone {
   background: #fdb618;
-}
-
-.stageDotActive {
-  background: #ed1c24;
-  box-shadow: 0 0 6px #ed1c24;
+  margin-left: 13px;
 }

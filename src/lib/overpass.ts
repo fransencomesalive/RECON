@@ -19,7 +19,7 @@ function getOverpassMirrors(): string[] {
 // does not fire reliably in Vercel's Node.js serverless runtime.
 async function fetchFromAnyMirror(body: string): Promise<Response> {
   const mirrors = getOverpassMirrors()
-  const MIRROR_TIMEOUT = 18_000
+  const MIRROR_TIMEOUT = 22_000
 
   console.log('[overpass] mirrors:', mirrors.map(m => m.replace(/^https?:\/\//, '')))
 
@@ -95,7 +95,7 @@ function buildQuery(bbox: [number, number, number, number]): string {
   const b = `${s},${w},${n},${e}`
 
   return `
-[out:json][timeout:15];
+[out:json][timeout:20];
 (
   way["highway"]["surface"](${b});
   way["highway"]["tracktype"](${b});
@@ -281,7 +281,15 @@ async function fetchRoutedBailoutGeometry(b: BailoutRoute): Promise<BailoutRoute
       `https://api.mapbox.com/directions/v5/mapbox/cycling/` +
       `${b.intersection_lng},${b.intersection_lat};${b.destination_lng},${b.destination_lat}` +
       `?access_token=${token}&overview=full&geometries=geojson`
-    const res = await fetch(url, { signal: AbortSignal.timeout(3_000) })
+    // AbortSignal.timeout is unreliable in Vercel Node.js — use explicit controller
+    const controller = new AbortController()
+    const bailoutTimer = setTimeout(() => controller.abort(), 6_000)
+    let res: Response
+    try {
+      res = await fetch(url, { signal: controller.signal })
+    } finally {
+      clearTimeout(bailoutTimer)
+    }
     if (!res.ok) {
       // HTTP error (not a routing failure) → keep with fallback
       return { ...b, road_geometry: [...b.road_geometry, [b.destination_lng, b.destination_lat]] }

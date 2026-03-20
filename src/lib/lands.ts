@@ -59,19 +59,26 @@ export async function enrichPublicLands(route: CanonicalRoute): Promise<LandCros
   const [minLng, minLat, maxLng, maxLat] = route.bbox
 
   const params = new URLSearchParams({
+    where: '1=1',
     geometry: `${minLng},${minLat},${maxLng},${maxLat}`,
     geometryType: 'esriGeometryEnvelope',
     inSR: '4326',
     outSR: '4326',
     spatialRel: 'esriSpatialRelIntersects',
-    outFields: 'unit_name,Agency',
+    outFields: '*',
     returnGeometry: 'false',
     f: 'json',
   })
 
-  const res = await fetch(`${ESRI_FEDERAL_LANDS}?${params}`, {
-    signal: AbortSignal.timeout(15_000),
-  })
+  // AbortSignal.timeout is unreliable in Vercel Node.js — use explicit controller
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), 12_000)
+  let res: Response
+  try {
+    res = await fetch(`${ESRI_FEDERAL_LANDS}?${params}`, { signal: controller.signal })
+  } finally {
+    clearTimeout(timer)
+  }
 
   if (!res.ok) throw new Error(`Esri FeatureServer error: ${res.status}`)
 
@@ -86,15 +93,25 @@ export async function enrichPublicLands(route: CanonicalRoute): Promise<LandCros
   const crossings: LandCrossing[] = []
 
   for (const f of features) {
-    const name = f.attributes.unit_name ?? 'Unknown Area'
+    const attrs = f.attributes
+    // Field names vary across Esri service versions — try common variants
+    const name = (
+      attrs.unit_name ?? attrs.Unit_Name ?? attrs.UNIT_NM ??
+      attrs.Name ?? attrs.NAME ?? 'Unknown Area'
+    ) as string
     if (seen.has(name)) continue
     seen.add(name)
+
+    const rawAgency = (
+      attrs.Agency ?? attrs.agency ?? attrs.Mang_Name ??
+      attrs.agbur ?? attrs.AGBUR
+    ) as string | undefined
 
     const { entry_km, exit_km } = estimateCrossing(route, f, route.distance_km)
 
     crossings.push({
       name,
-      agency: normalizeAgency(f.attributes.Agency),
+      agency: normalizeAgency(rawAgency),
       type: 'Federal Land',
       entry_km,
       exit_km,
