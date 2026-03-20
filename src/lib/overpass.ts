@@ -18,7 +18,7 @@ function getOverpassMirrors(): string[] {
 // Parallel (vs sequential) cuts the failure wait from ~24 s to ~12 s when all mirrors time out.
 async function fetchFromAnyMirror(body: string): Promise<Response> {
   const mirrors = getOverpassMirrors()
-  const MIRROR_TIMEOUT = 12_000
+  const MIRROR_TIMEOUT = 20_000
 
   return new Promise((resolve, reject) => {
     const errors: string[] = []
