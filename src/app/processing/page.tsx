@@ -48,50 +48,53 @@ function drawMesh(ctx: CanvasRenderingContext2D, nodes: MeshNode[], W: number, H
   })
 }
 
-// ─── Route SVG path ───────────────────────────────────────────────────────────
+// ─── Tileable elevation data ──────────────────────────────────────────────────
+// Integer sine multiples guarantee seamless looping (all waves complete at N)
 
-const ROUTE_D = `
-  M 30,230
-  C 55,210 70,198 95,180
-  C 120,162 114,145 138,126
-  C 162,107 184,118 206,100
-  C 228,82  224,60  250,46
-  C 276,32  304,42  328,34
-  C 352,26  370,36  394,48
-  C 418,60  432,46  458,58
-  C 484,70  492,98  514,108
-  C 536,118 562,102 586,116
-  C 610,130 616,158 636,170
-  C 656,182 680,170 700,184
-  C 718,196 724,220 710,238
-  C 696,256 672,252 650,258
-`
+const ELEV_N = 2000
+const ELEV_DATA = (() => {
+  const data = new Float32Array(ELEV_N)
+  let min = Infinity, max = -Infinity
+  for (let i = 0; i < ELEV_N; i++) {
+    const t = (i / ELEV_N) * Math.PI * 2
+    data[i] =
+      Math.sin(t * 3)  * 0.40 +
+      Math.sin(t * 7)  * 0.22 +
+      Math.sin(t * 13) * 0.13 +
+      Math.sin(t * 23) * 0.07 +
+      Math.sin(t * 41) * 0.03
+    if (data[i] < min) min = data[i]
+    if (data[i] > max) max = data[i]
+  }
+  const range = max - min
+  for (let i = 0; i < ELEV_N; i++) data[i] = (data[i] - min) / range
+  return data
+})()
 
 // ─── Service definitions ──────────────────────────────────────────────────────
 
-type ServiceKey = 'osm' | 'weather' | 'lands' | 'coverage'
+type ServiceKey = 'parse' | 'osm' | 'weather' | 'lands' | 'coverage'
 type ServiceStatus = 'pending' | 'loading' | 'done' | 'error'
 type NarrativeStatus = 'hidden' | 'pending' | 'loading' | 'done' | 'error'
 
 const SERVICES: { key: ServiceKey; label: string }[] = [
-  { key: 'osm',      label: 'TERRAIN & INFRASTRUCTURE' },
-  { key: 'weather',  label: 'WEATHER CONDITIONS' },
-  { key: 'lands',    label: 'PUBLIC LAND CROSSINGS' },
-  { key: 'coverage', label: 'CELL COVERAGE' },
+  { key: 'parse',    label: 'Parsing route file' },
+  { key: 'osm',      label: 'Mapping terrain & infrastructure' },
+  { key: 'weather',  label: 'Pulling weather forecast' },
+  { key: 'lands',    label: 'Querying land boundaries' },
+  { key: 'coverage', label: 'Establishing mobile coverage strength' },
 ]
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function ProcessingPage() {
-  const bgRef          = useRef<HTMLCanvasElement>(null)
-  const grainRef       = useRef<HTMLCanvasElement>(null)
-  const routeRef       = useRef<SVGPathElement>(null)
-  const dotRef         = useRef<SVGCircleElement>(null)
-  const progressPathRef = useRef<SVGPathElement>(null)
+  const bgRef    = useRef<HTMLCanvasElement>(null)
+  const grainRef = useRef<HTMLCanvasElement>(null)
+  const elevRef  = useRef<HTMLCanvasElement>(null)
 
   const [analyzeId, setAnalyzeId]         = useState<string | null>(null)
   const [services, setServices]           = useState<Record<ServiceKey, ServiceStatus>>({
-    osm: 'pending', weather: 'pending', lands: 'pending', coverage: 'pending',
+    parse: 'loading', osm: 'pending', weather: 'pending', lands: 'pending', coverage: 'pending',
   })
   const [narrativeStatus, setNarrativeStatus] = useState<NarrativeStatus>('hidden')
   const [apiError, setApiError]           = useState<string | null>(null)
@@ -141,6 +144,7 @@ export default function ProcessingPage() {
         sessionStorage.removeItem('recon_file_data')
         sessionStorage.removeItem('recon_file_name')
         sessionStorage.removeItem('recon_route_url')
+        setServices(s => ({ ...s, parse: 'done' }))
         setAnalyzeId(data.id!)
       })
       .catch(err => setApiError(err.message ?? 'Analysis failed.'))
@@ -164,7 +168,7 @@ export default function ProcessingPage() {
       setServices(s => ({ ...s, [key]: status }))
 
     const run = async () => {
-      setServices({ osm: 'loading', weather: 'loading', lands: 'loading', coverage: 'loading' })
+      setServices(s => ({ ...s, osm: 'loading', weather: 'loading', lands: 'loading', coverage: 'loading' }))
 
       // Fire OSM, weather, lands, coverage in parallel; track each individually
       const osmP = post('/api/enrich/osm', { id: analyzeId })
@@ -296,42 +300,96 @@ export default function ProcessingPage() {
     return () => { window.removeEventListener('resize', resize); cancelAnimationFrame(raf) }
   }, [])
 
-  // ── Route trace animation (loops) ──────────────────────────────────────────
+  // ── Excitebike elevation scroll ─────────────────────────────────────────────
   useEffect(() => {
-    const path         = routeRef.current
-    const progressPath = progressPathRef.current
-    const dot          = dotRef.current
-    if (!path || !progressPath || !dot) return
+    const canvas = elevRef.current
+    if (!canvas) return
 
-    const totalLength = path.getTotalLength()
-    path.style.strokeDasharray  = `${totalLength}`
-    path.style.strokeDashoffset = '0'
-    progressPath.style.strokeDasharray  = `${totalLength}`
-    progressPath.style.strokeDashoffset = `${totalLength}`
+    const DPR = window.devicePixelRatio || 1
+    let W = 0, H = 0
 
-    const DURATION = 9000
-    let start = performance.now()
+    const resize = () => {
+      const rect = canvas.getBoundingClientRect()
+      W = rect.width; H = rect.height
+      canvas.width  = Math.round(W * DPR)
+      canvas.height = Math.round(H * DPR)
+    }
+    resize()
+
+    const ctx = canvas.getContext('2d')!
+    const CHART_T = 0.10
+    const CHART_B = 0.90
+    const DOT_X_F = 0.25
+    const VISIBLE  = ELEV_N * 0.35
+    const SPEED    = VISIBLE / (9 * 60)
+
+    let offset = 0, pulseT = 0
     let raf: number
 
-    const animate = (now: number) => {
-      const p = Math.min((now - start) / DURATION, 1)
-      const drawn = totalLength * p
-      progressPath.style.strokeDashoffset = `${totalLength - drawn}`
-      const pt = path.getPointAtLength(drawn)
-      dot.setAttribute('cx', String(pt.x))
-      dot.setAttribute('cy', String(pt.y))
-      if (p >= 1) {
-        // Loop: pause briefly, then restart
-        setTimeout(() => {
-          progressPath.style.strokeDashoffset = `${totalLength}`
-          start = performance.now() + 400
-        }, 600)
-      }
-      raf = requestAnimationFrame(animate)
+    const getY = (screenX: number): number => {
+      const raw  = (offset + (screenX / W) * VISIBLE + ELEV_N) % ELEV_N
+      const i0   = Math.floor(raw) % ELEV_N
+      const i1   = (i0 + 1) % ELEV_N
+      const frac = raw - Math.floor(raw)
+      const v    = ELEV_DATA[i0] * (1 - frac) + ELEV_DATA[i1] * frac
+      return H * CHART_B - v * H * (CHART_B - CHART_T)
     }
 
-    const timer = setTimeout(() => { raf = requestAnimationFrame(animate) }, 400)
-    return () => { clearTimeout(timer); cancelAnimationFrame(raf) }
+    const draw = () => {
+      ctx.setTransform(DPR, 0, 0, DPR, 0, 0)
+      ctx.clearRect(0, 0, W, H)
+
+      const dotX = W * DOT_X_F
+      const dotY = getY(dotX)
+
+      // Amber ghost path (full width)
+      ctx.beginPath()
+      for (let x = 0; x <= W; x++) {
+        const y = getY(x)
+        x === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y)
+      }
+      ctx.strokeStyle = '#fdb618'
+      ctx.globalAlpha = 0.4
+      ctx.lineWidth   = 2.5
+      ctx.lineJoin    = 'round'
+      ctx.lineCap     = 'round'
+      ctx.stroke()
+
+      // Red path (visited — left edge to dot)
+      ctx.beginPath()
+      for (let x = 0; x <= dotX; x++) {
+        const y = getY(x)
+        x === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y)
+      }
+      ctx.strokeStyle = '#ed1c24'
+      ctx.globalAlpha = 1
+      ctx.lineWidth   = 2.5
+      ctx.stroke()
+
+      // Dot glow
+      pulseT += 0.06
+      const pulseR = 4.5 + Math.sin(pulseT) * 2
+      const grd = ctx.createRadialGradient(dotX, dotY, 0, dotX, dotY, pulseR * 3)
+      grd.addColorStop(0, 'rgba(237,28,36,0.55)')
+      grd.addColorStop(1, 'rgba(237,28,36,0)')
+      ctx.fillStyle = grd
+      ctx.beginPath()
+      ctx.arc(dotX, dotY, pulseR * 3, 0, Math.PI * 2)
+      ctx.fill()
+
+      // Dot
+      ctx.beginPath()
+      ctx.arc(dotX, dotY, pulseR, 0, Math.PI * 2)
+      ctx.fillStyle = '#ed1c24'
+      ctx.globalAlpha = 1
+      ctx.fill()
+
+      offset = (offset + SPEED + ELEV_N) % ELEV_N
+      raf = requestAnimationFrame(draw)
+    }
+
+    raf = requestAnimationFrame(draw)
+    return () => cancelAnimationFrame(raf)
   }, [])
 
   // ── Error UI ────────────────────────────────────────────────────────────────
@@ -389,22 +447,12 @@ export default function ProcessingPage() {
         </header>
 
         <div className={styles.card}>
-          {/* Route trace animation */}
-          <svg
+          {/* Excitebike elevation scroll */}
+          <canvas
+            ref={elevRef}
             className={styles.routeSvg}
-            viewBox="0 0 720 280"
-            fill="none"
-            xmlns="http://www.w3.org/2000/svg"
-            preserveAspectRatio="xMidYMid meet"
-          >
-            <circle cx="30"  cy="230" r="5" fill="#fdb618" opacity="0.7" />
-            <circle cx="650" cy="258" r="5" fill="#fdb618" opacity="0.7" />
-            <path ref={routeRef} d={ROUTE_D} stroke="#fdb618" strokeWidth="3"
-              strokeLinecap="round" strokeLinejoin="round" opacity="0.4" />
-            <path ref={progressPathRef} d={ROUTE_D} stroke="#ed1c24" strokeWidth="3"
-              strokeLinecap="round" strokeLinejoin="round" />
-            <circle ref={dotRef} cx="30" cy="230" r="5" fill="#ed1c24" className={styles.dot} />
-          </svg>
+            style={{ aspectRatio: '720 / 280' }}
+          />
 
           <div className={styles.divider} />
 
@@ -421,10 +469,7 @@ export default function ProcessingPage() {
                       status === 'done'    ? styles.serviceDotDone :
                       status === 'error'   ? styles.serviceDotError : '',
                     ].join(' ')} />
-                    <span className={[
-                      styles.serviceLabel,
-                      status === 'done' || status === 'error' ? styles.serviceLabelMuted : '',
-                    ].join(' ')}>
+                    <span className={styles.serviceLabel}>
                       {label}
                     </span>
                   </div>
@@ -452,9 +497,9 @@ export default function ProcessingPage() {
                     narrativeStatus === 'error'   ? styles.serviceDotError : '',
                   ].join(' ')} />
                   <span className={styles.narrativeLabel}>
-                    {narrativeStatus === 'done'  ? 'ROUTE INTELLIGENCE COMPILED' :
-                     narrativeStatus === 'error' ? 'NARRATIVE UNAVAILABLE' :
-                     'GENERATING ROUTE INTELLIGENCE'}
+                    {narrativeStatus === 'done'  ? 'R.E.C.O.N. intelligence ready' :
+                     narrativeStatus === 'error' ? 'Intelligence generation failed' :
+                     'Generating R.E.C.O.N.'}
                   </span>
                   {narrativeStatus === 'loading' && (
                     <span className={styles.narrativeDots} aria-hidden>...</span>

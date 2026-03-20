@@ -290,11 +290,11 @@ export default function RouteMap({ result, activeLayers, weatherSegments, classN
             },
           })
 
-          // 🛑 marker at each intersection point
+          // ☠️ marker at each intersection point
           const bailoutEls: HTMLElement[] = []
           for (const b of bailouts) {
             const el = document.createElement('div')
-            el.textContent = '🛑'
+            el.textContent = '☠️'
             el.style.cssText = 'font-size:24px;cursor:pointer;user-select:none;filter:drop-shadow(0 1px 3px rgba(0,0,0,0.55));'
             const bailoutMi = (b.bailout_km * 0.621371).toFixed(1)
             const savesMi   = (b.saves_km   * 0.621371).toFixed(1)

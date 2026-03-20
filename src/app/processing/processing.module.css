@@ -30,7 +30,7 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
   gap: 2rem;
   padding: 2rem 1.5rem;
 }
@@ -79,16 +79,6 @@
   display: block;
 }
 
-/* Moving dot pulse */
-.dot {
-  filter: drop-shadow(0 0 4px #ed1c24);
-  animation: pulse 0.8s ease-in-out infinite alternate;
-}
-
-@keyframes pulse {
-  from { r: 4; opacity: 1; }
-  to   { r: 7; opacity: 0.6; }
-}
 
 /* ─── Divider ─────────────────────────────────────────────────────────────── */
 .divider {
@@ -148,12 +138,12 @@
   font-family: var(--font-geist-mono, monospace);
   font-size: 0.68rem;
   letter-spacing: 0.1em;
-  color: rgba(0, 0, 0, 0.8);
+  color: #016a7d;
   transition: color 0.4s;
 }
 
 .serviceLabelMuted {
-  color: rgba(0, 0, 0, 0.4);
+  color: rgba(1, 106, 125, 0.4);
 }
 
 /* ─── Progress bars ───────────────────────────────────────────────────────── */
@@ -221,7 +211,7 @@
   font-family: var(--font-geist-mono, monospace);
   font-size: 0.68rem;
   letter-spacing: 0.1em;
-  color: rgba(0, 0, 0, 0.75);
+  color: #016a7d;
 }
 
 @keyframes fadeIn {

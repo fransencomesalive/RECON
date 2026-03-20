@@ -51,12 +51,13 @@ function drawMesh(ctx: CanvasRenderingContext2D, nodes: MeshNode[], W: number, H
 // ─── Elevation SVG helpers ────────────────────────────────────────────────────
 
 const SVG_W     = 800
-const SVG_H     = 220
+const SVG_H     = 304
 const WEATHER_H = 20
 const CHART_L   = 10, CHART_R = 790
-// 4 POI lanes × 14px each, plus 6px gap below last lane before chart starts
-const CHART_T   = WEATHER_H + 4 * 14 + 6   // = 82
-const CHART_B   = 210
+// 5 lanes × 24px each (4 POI + 1 bailout), plus 10px gap before chart
+const CHART_T        = WEATHER_H + 5 * 24 + 10   // = 150
+const CHART_B        = 294
+const BAILOUT_LANE_Y = WEATHER_H + 18 + 4 * 24   // = 134 (bottom lane)
 
 // Vertical lane per POI type: 0 = top (emergency), 3 = bottom (water)
 const POI_LANE: Record<string, number> = {
@@ -65,7 +66,7 @@ const POI_LANE: Record<string, number> = {
   shelter:   2,
   water:     3,
 }
-const poiLaneY = (type: string) => WEATHER_H + 12 + (POI_LANE[type] ?? 1) * 14
+const poiLaneY = (type: string) => WEATHER_H + 18 + (POI_LANE[type] ?? 1) * 24
 
 type ElevPoint = { dist: number; elev: number; surface: SurfaceType }
 type SurfaceGroup = { surface: SurfaceType; pts: ElevPoint[] }
@@ -128,12 +129,6 @@ const WEATHER_COLOR: Record<WeatherRisk, string> = {
   red:   '#ed1c24',
 }
 
-const POI_COLOR: Record<string, string> = {
-  water:     '#00aac9',
-  shop:      '#fdb618',
-  emergency: '#fcba4b',
-  shelter:   '#aaa',
-}
 
 function poiSymbol(poi: { type: string; potable?: boolean; note?: string }): string {
   switch (poi.type) {
@@ -348,8 +343,7 @@ export default function ResultsPage() {
     return `${d} L ${toX(last.dist).toFixed(1)},${CHART_B} L ${toX(first.dist).toFixed(1)},${CHART_B} Z`
   }
 
-  const pavedPct    = result.surfaces.find(s => s.type === 'paved')?.pct ?? 0
-  const nonPavedPct = 100 - pavedPct
+  const pavedPct = result.surfaces.find(s => s.type === 'paved')?.pct ?? 0
 
   const rideHours   = naisimithHours(route.distance_km, route.elevation_gain_m, speedKph)
   const rideTimeStr = formatHours(rideHours)
@@ -531,14 +525,25 @@ export default function ResultsPage() {
               })}
 
               {/* POI markers — staggered by type into 4 vertical lanes */}
-              {chartPois.map((poi, i) => {
+              {activeLayers.has('POIs') && chartPois.map((poi, i) => {
                 const x  = toX(poi.distance_km)
                 const ey = poiLaneY(poi.type)
-                const color = POI_COLOR[poi.type] ?? '#aaa'
+                const emojiSize = poi.type === 'water' ? 18 : 16
                 return (
                   <g key={i}>
-                    <line x1={x} y1={ey + 3} x2={x} y2={CHART_B} stroke={color} strokeWidth="1" strokeDasharray="3 3" opacity="0.6" />
-                    <text x={x} y={ey} textAnchor="middle" fontSize="11" style={{ userSelect: 'none' }}>{poiSymbol(poi)}</text>
+                    <line x1={x} y1={ey + 3} x2={x} y2={CHART_B} stroke="#555" strokeWidth="1" strokeDasharray="3 3" opacity="0.5" />
+                    <text x={x} y={ey} textAnchor="middle" fontSize={emojiSize} style={{ userSelect: 'none' }}>{poiSymbol(poi)}</text>
+                  </g>
+                )
+              })}
+
+              {/* Bailout markers — bottom lane, toggled with Bailouts layer */}
+              {activeLayers.has('Bailouts') && (result.bailouts ?? []).map((b, i) => {
+                const x = toX(b.distance_km)
+                return (
+                  <g key={i}>
+                    <line x1={x} y1={BAILOUT_LANE_Y + 3} x2={x} y2={CHART_B} stroke="#555" strokeWidth="1" strokeDasharray="3 3" opacity="0.5" />
+                    <text x={x} y={BAILOUT_LANE_Y} textAnchor="middle" fontSize="16" style={{ userSelect: 'none' }}>☠️</text>
                   </g>
                 )
               })}
@@ -549,50 +554,35 @@ export default function ResultsPage() {
 
             {/* Legend */}
             <div className={styles.elevLegend}>
-              <div className={styles.legendGroup}>
-                <span className={styles.legendTitle}>Surface</span>
-                <span className={styles.legendItem}>
-                  <svg width="24" height="10"><line x1="0" y1="5" x2="24" y2="5" stroke="#016a7d" strokeWidth="2" /></svg> Paved
-                </span>
-                <span className={styles.legendItem}>
-                  <svg width="24" height="10"><line x1="0" y1="5" x2="24" y2="5" stroke="#016a7d" strokeWidth="2" strokeDasharray="6 4" /></svg> Unpaved
-                </span>
-              </div>
-              <div className={styles.legendGroup}>
+              <div className={styles.legendSection}>
                 <span className={styles.legendTitle}>Points</span>
-                {[
-                  { emoji: '🚰', label: 'Potable water' },
-                  { emoji: '🐟', label: 'Filter required' },
-                  { emoji: '🛠️', label: 'Bike shop' },
-                  { emoji: '🔧', label: 'Repair station' },
-                  { emoji: '🚒', label: 'Fire station' },
-                  { emoji: '🏥', label: 'Hospital / Clinic' },
-                  { emoji: '🩺', label: "Doctor's office" },
-                  { emoji: '📞', label: 'Emergency phone' },
-                  { emoji: '🛖', label: 'Shelter' },
-                  { emoji: '🛑', label: 'Bailout point' },
-                ].map(({ emoji, label }) => (
-                  <span key={label} className={styles.legendItem}>
-                    <span style={{ fontSize: '10px' }}>{emoji}</span> {label}
-                  </span>
-                ))}
+                <div className={styles.legendPointsGrid}>
+                  {[
+                    { emoji: '🚰', label: 'Potable water' },
+                    { emoji: '🐟', label: 'Filter required' },
+                    { emoji: '🛠️', label: 'Bike shop' },
+                    { emoji: '🔧', label: 'Repair station' },
+                    { emoji: '🚒', label: 'Fire station' },
+                    { emoji: '🏥', label: 'Hospital / Clinic' },
+                    { emoji: '🩺', label: "Doctor's office" },
+                    { emoji: '📞', label: 'Emergency phone' },
+                    { emoji: '🛖', label: 'Shelter' },
+                    { emoji: '☠️', label: 'Bailout point' },
+                  ].map(({ emoji, label }) => (
+                    <span key={label} className={styles.legendItem}>
+                      <span style={{ fontSize: '14px' }}>{emoji}</span> {label}
+                    </span>
+                  ))}
+                </div>
               </div>
               {activeLayers.has('Weather') && weatherZones.length > 0 && (
-                <div className={styles.legendGroup}>
+                <div className={styles.legendRow}>
                   <span className={styles.legendTitle}>Weather</span>
                   <span className={styles.legendItem}><span style={{ display: 'inline-block', width: 12, height: 12, borderRadius: 2, background: WEATHER_COLOR.green, opacity: 0.8 }} /> Clear</span>
                   <span className={styles.legendItem}><span style={{ display: 'inline-block', width: 12, height: 12, borderRadius: 2, background: WEATHER_COLOR.amber, opacity: 0.8 }} /> Caution</span>
                   <span className={styles.legendItem}><span style={{ display: 'inline-block', width: 12, height: 12, borderRadius: 2, background: WEATHER_COLOR.red, opacity: 0.8 }} /> Danger</span>
                 </div>
               )}
-              <div className={styles.legendGroup}>
-                <span className={styles.legendTitle}>Surface mix</span>
-                <div className={styles.surfaceBar}>
-                  <div style={{ width: `${pavedPct}%`, background: 'rgba(1,106,125,0.5)', height: '100%' }} />
-                  <div style={{ width: `${nonPavedPct}%`, background: 'repeating-linear-gradient(45deg,rgba(1,106,125,0.3),rgba(1,106,125,0.3) 3px,transparent 3px,transparent 8px)', height: '100%' }} />
-                </div>
-                <span className={styles.surfaceBarLabel}>{pavedPct}% paved · {nonPavedPct}% unpaved</span>
-              </div>
             </div>
           </div>
           </div>
@@ -616,8 +606,11 @@ export default function ResultsPage() {
               <span className={styles.statLabel}>Est. Ride Time</span>
               <span className={styles.statValue}>{rideTimeStr}</span>
               <div className={styles.rideControls}>
-                <label className={styles.rideControlLabel}>
-                  Speed
+                <div className={styles.rideControl}>
+                  <div className={styles.rideControlRow}>
+                    <span className={styles.rideControlName}>Speed</span>
+                    <span className={styles.rideControlVal}>{speedDisplay}</span>
+                  </div>
                   <input
                     type="range"
                     min={unit === 'imperial' ? 5 : 8}
@@ -630,10 +623,12 @@ export default function ResultsPage() {
                     }}
                     className={styles.rideSlider}
                   />
-                  <span>{speedDisplay}</span>
-                </label>
-                <label className={styles.rideControlLabel}>
-                  Start
+                </div>
+                <div className={styles.rideControl}>
+                  <div className={styles.rideControlRow}>
+                    <span className={styles.rideControlName}>Start Time</span>
+                    <span className={styles.rideControlVal}>{startTimeStr}</span>
+                  </div>
                   <input
                     type="range"
                     min={4} max={12} step={1}
@@ -641,8 +636,7 @@ export default function ResultsPage() {
                     onChange={e => setStartHour(+e.target.value)}
                     className={styles.rideSlider}
                   />
-                  <span>{startTimeStr}</span>
-                </label>
+                </div>
               </div>
             </div>
             <div className={styles.statCard}>
@@ -689,6 +683,33 @@ export default function ResultsPage() {
                     </div>
                   )
                 })}
+              </div>
+            )}
+
+            {/* Bailout routes */}
+            {(result.bailouts ?? []).length > 0 && (
+              <div className={styles.card}>
+                <span className={styles.sectionTitle}>☠️ Bailout Routes</span>
+                {(result.bailouts ?? []).map((b, i) => (
+                  <div key={b.id ?? i} className={styles.landRow} style={{ flexDirection: 'column', alignItems: 'flex-start', gap: '0.2rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <span className={styles.gapBadge} style={{ background: '#ed1c24' }}>
+                        {unit === 'imperial'
+                          ? `Mi ${(b.distance_km * 0.621371).toFixed(1)}`
+                          : `Km ${b.distance_km.toFixed(1)}`}
+                      </span>
+                      <span className={styles.landName}>
+                        {b.road_name ? `${b.road_name} → ` : ''}{b.destination_name}
+                      </span>
+                    </div>
+                    <span className={styles.landMeta}>
+                      {bailoutDist(b, unit)} to safety
+                      {' · '}
+                      <strong style={{ color: '#2d8a4e' }}>saves {bailoutSaves(b, unit)}</strong>
+                      {b.next_safe_name ? ` vs. continuing to ${b.next_safe_name}` : ' vs. continuing on route'}
+                    </span>
+                  </div>
+                ))}
               </div>
             )}
 
@@ -739,55 +760,12 @@ export default function ResultsPage() {
               </div>
             )}
 
-            {/* Bailout routes */}
-            {(result.bailouts ?? []).length > 0 && (
-              <div className={styles.card}>
-                <span className={styles.sectionTitle}>🛑 Bailout Routes</span>
-                {(result.bailouts ?? []).map((b, i) => (
-                  <div key={b.id ?? i} className={styles.landRow} style={{ flexDirection: 'column', alignItems: 'flex-start', gap: '0.2rem' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                      <span className={styles.gapBadge} style={{ background: '#ed1c24' }}>
-                        {unit === 'imperial'
-                          ? `Mi ${(b.distance_km * 0.621371).toFixed(1)}`
-                          : `Km ${b.distance_km.toFixed(1)}`}
-                      </span>
-                      <span className={styles.landName}>
-                        {b.road_name ? `${b.road_name} → ` : ''}{b.destination_name}
-                      </span>
-                    </div>
-                    <span className={styles.landMeta}>
-                      {bailoutDist(b, unit)} to safety
-                      {' · '}
-                      <strong style={{ color: '#2d8a4e' }}>saves {bailoutSaves(b, unit)}</strong>
-                      {b.next_safe_name ? ` vs. continuing to ${b.next_safe_name}` : ' vs. continuing on route'}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {/* Land management */}
-            {result.lands.length > 0 && (
-              <div className={styles.card}>
-                <span className={styles.sectionTitle}>Land Management</span>
-                {result.lands.map((land, i) => (
-                  <div key={i} className={styles.landRow}>
-                    <span className={styles.landName}>{land.name}</span>
-                    <span className={styles.landMeta}>
-                      {unit === 'imperial'
-                        ? `${(land.entry_km * 0.621371).toFixed(1)}–${(land.exit_km * 0.621371).toFixed(1)} mi`
-                        : `${land.entry_km.toFixed(1)}–${land.exit_km.toFixed(1)} km`}
-                      {' · '}{land.agency}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            )}
-
           </div>
 
-          {/* Planning summary */}
+          {/* Right column */}
           <div className={styles.dossierRight}>
+
+            {/* Planning summary */}
             <div className={styles.card}>
               <span className={styles.sectionTitle}>Planning Summary</span>
               {result.narrative ? (
@@ -827,6 +805,25 @@ export default function ResultsPage() {
                 ))}
               </div>
             )}
+
+            {/* Land management — always last */}
+            {result.lands.length > 0 && (
+              <div className={styles.card}>
+                <span className={styles.sectionTitle}>Land Management</span>
+                {result.lands.map((land, i) => (
+                  <div key={i} className={styles.landRow}>
+                    <span className={styles.landName}>{land.name}</span>
+                    <span className={styles.landMeta}>
+                      {unit === 'imperial'
+                        ? `${(land.entry_km * 0.621371).toFixed(1)}–${(land.exit_km * 0.621371).toFixed(1)} mi`
+                        : `${land.entry_km.toFixed(1)}–${land.exit_km.toFixed(1)} km`}
+                      {' · '}{land.agency}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+
           </div>
         </div>
 
