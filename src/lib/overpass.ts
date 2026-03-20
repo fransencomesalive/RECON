@@ -15,35 +15,70 @@ function getOverpassMirrors(): string[] {
 }
 
 // Fires all mirrors in parallel and resolves with the first successful response.
-// Parallel (vs sequential) cuts the failure wait from ~24 s to ~12 s when all mirrors time out.
+// Uses explicit setTimeout+AbortController instead of AbortSignal.timeout, which
+// does not fire reliably in Vercel's Node.js serverless runtime.
 async function fetchFromAnyMirror(body: string): Promise<Response> {
   const mirrors = getOverpassMirrors()
-  const MIRROR_TIMEOUT = 20_000
+  const MIRROR_TIMEOUT = 18_000
+
+  console.log('[overpass] mirrors:', mirrors.map(m => m.replace(/^https?:\/\//, '')))
 
   return new Promise((resolve, reject) => {
     const errors: string[] = []
-    let pending = mirrors.length
-    let resolved = false
+    let remaining = mirrors.length
+    let settled = false
+    const timers: ReturnType<typeof setTimeout>[] = []
+    const controllers: AbortController[] = []
 
-    for (const mirror of mirrors) {
+    mirrors.forEach((mirror, i) => {
+      const controller = new AbortController()
+      controllers[i] = controller
+
+      // Explicit timeout — more reliable than AbortSignal.timeout in serverless environments
+      timers[i] = setTimeout(() => {
+        if (settled) return
+        controller.abort()
+        errors.push(`${mirror}: timeout after ${MIRROR_TIMEOUT}ms`)
+        if (--remaining === 0) {
+          settled = true
+          reject(new Error(`All Overpass mirrors failed: ${errors.join('; ')}`))
+        }
+      }, MIRROR_TIMEOUT)
+
       fetch(mirror, {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body,
-        signal: AbortSignal.timeout(MIRROR_TIMEOUT),
+        signal: controller.signal,
       }).then(r => {
-        if (resolved) return
-        if (r.ok) { resolved = true; resolve(r) }
-        else {
+        if (settled) return
+        clearTimeout(timers[i])
+        if (r.ok) {
+          settled = true
+          // Cancel other timers and abort other in-flight fetches
+          timers.forEach((t, j) => { if (j !== i) clearTimeout(t) })
+          controllers.forEach((c, j) => { if (j !== i) try { c.abort() } catch {} })
+          console.log('[overpass] success from:', mirror.replace(/^https?:\/\//, ''))
+          resolve(r)
+        } else {
           errors.push(`${mirror}: HTTP ${r.status}`)
-          if (--pending === 0) reject(new Error(`All Overpass mirrors failed: ${errors.join('; ')}`))
+          if (--remaining === 0) {
+            settled = true
+            reject(new Error(`All Overpass mirrors failed: ${errors.join('; ')}`))
+          }
         }
       }).catch(e => {
-        if (resolved) return
+        if (settled) return
+        // AbortError means our setTimeout already decremented remaining — don't double-count
+        if ((e as Error).name === 'AbortError') return
+        clearTimeout(timers[i])
         errors.push(`${mirror}: ${(e as Error).message}`)
-        if (--pending === 0) reject(new Error(`All Overpass mirrors failed: ${errors.join('; ')}`))
+        if (--remaining === 0) {
+          settled = true
+          reject(new Error(`All Overpass mirrors failed: ${errors.join('; ')}`))
+        }
       })
-    }
+    })
   })
 }
 const CORRIDOR_BUFFER_DEG = 0.02 // ~2 km buffer around bbox
