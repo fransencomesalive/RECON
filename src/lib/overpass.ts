@@ -584,7 +584,7 @@ export async function enrichFromOverpass(route: CanonicalRoute): Promise<{
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body,
-        signal: AbortSignal.timeout(30_000),
+        signal: AbortSignal.timeout(12_000),
       })
       if (r.ok) { res = r; break }
       lastError = `${r.status} ${r.statusText}`
