@@ -96,7 +96,7 @@ export async function POST(req: Request) {
       try {
         narrative = await Promise.race([
           generateNarrative({ route, surfaces, pois, supply_gaps, weather, lands }),
-          new Promise<string>((_, reject) => setTimeout(() => reject(new Error('narrative timeout')), 15_000)),
+          new Promise<string>((_, reject) => setTimeout(() => reject(new Error('narrative timeout')), 25_000)),
         ])
       } catch (e) {
         errors['narrative'] = (e as Error).message
@@ -189,7 +189,7 @@ Write from the perspective of an experienced route scout. Cover: terrain and sur
 
   // Abort the request at the network level after 12s so our outer 15s race always wins
   const controller = new AbortController()
-  const abortTimer = setTimeout(() => controller.abort(), 12_000)
+  const abortTimer = setTimeout(() => controller.abort(), 20_000)
   let message
   try {
     message = await client.messages.create(
