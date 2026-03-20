@@ -13,13 +13,16 @@ export async function generateMetadata({
     return { title: 'R.E.C.O.N.' }
   }
 
-  const title = `${result.route.name} on R.E.C.O.N. p/b Mettle Cycling`
+  const title       = `${result.route.name} on R.E.C.O.N. p/b Mettle Cycling`
+  const description = `${result.route.name} p/b Mettle Cycling`
 
   return {
     title,
+    description,
     openGraph: {
       title,
-      images: ['/RECON-shareimage.png'],
+      description,
+      images: ['/RECON-shareimage-v2.png'],
     },
   }
 }

@@ -20,12 +20,12 @@ export const metadata: Metadata = {
       : 'http://localhost:3000'
   ),
   title: 'R.E.C.O.N.',
-  description: 'Gravel route reconnaissance p/b Mettle Cycling',
+  description: 'Route Environment & Condition Observation for Navigation',
   icons: {
     icon: '/RECON-1x1-favicon.png',
   },
   openGraph: {
-    images: ['/RECON-shareimage.png'],
+    images: ['/RECON-shareimage-v2.png'],
   },
 };
 
