@@ -9,6 +9,7 @@ import type {
   WeatherResult,
   LandCrossing,
   CoverageSegment,
+  WindField,
 } from '@/lib/types'
 
 // ─── Mesh gradient (shared with intake) ──────────────────────────────────────
@@ -73,7 +74,7 @@ const ELEV_DATA = (() => {
 
 // ─── Service definitions ──────────────────────────────────────────────────────
 
-type ServiceKey = 'parse' | 'osm' | 'weather' | 'lands' | 'coverage'
+type ServiceKey = 'parse' | 'osm' | 'weather' | 'lands' | 'coverage' | 'wind'
 type ServiceStatus = 'pending' | 'loading' | 'done' | 'error'
 type NarrativeStatus = 'hidden' | 'pending' | 'loading' | 'done' | 'error'
 
@@ -83,6 +84,7 @@ const SERVICES: { key: ServiceKey; label: string }[] = [
   { key: 'weather',  label: 'Pulling weather forecast' },
   { key: 'lands',    label: 'Querying land boundaries' },
   { key: 'coverage', label: 'Establishing mobile coverage strength' },
+  { key: 'wind',     label: 'Building wind field' },
 ]
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -94,7 +96,7 @@ export default function ProcessingPage() {
 
   const [analyzeId, setAnalyzeId]         = useState<string | null>(null)
   const [services, setServices]           = useState<Record<ServiceKey, ServiceStatus>>({
-    parse: 'loading', osm: 'pending', weather: 'pending', lands: 'pending', coverage: 'pending',
+    parse: 'loading', osm: 'pending', weather: 'pending', lands: 'pending', coverage: 'pending', wind: 'pending',
   })
   const [narrativeStatus, setNarrativeStatus] = useState<NarrativeStatus>('hidden')
   const [apiError, setApiError]           = useState<string | null>(null)
@@ -104,6 +106,7 @@ export default function ProcessingPage() {
   const weatherRef  = useRef<WeatherResult | null>(null)
   const landsRef    = useRef<LandCrossing[] | null>(null)
   const coverageRef = useRef<CoverageSegment[] | null>(null)
+  const windRef     = useRef<WindField | null>(null)
   const narrativeRef = useRef<string>('')
   const errorsRef   = useRef<Record<string, string>>({})
 
@@ -168,7 +171,7 @@ export default function ProcessingPage() {
       setServices(s => ({ ...s, [key]: status }))
 
     const run = async () => {
-      setServices(s => ({ ...s, osm: 'loading', weather: 'loading', lands: 'loading', coverage: 'loading' }))
+      setServices(s => ({ ...s, osm: 'loading', weather: 'loading', lands: 'loading', coverage: 'loading', wind: 'loading' }))
 
       // Fire OSM, weather, lands, coverage in parallel; track each individually
       const osmP = post('/api/enrich/osm', { id: analyzeId })
@@ -203,6 +206,14 @@ export default function ProcessingPage() {
         })
         .catch(e => { if (!cancelled) { errorsRef.current.coverage = e.message; setStatus('coverage', 'error') } })
 
+      const windP = post('/api/enrich/wind', { id: analyzeId })
+        .then(data => {
+          if (cancelled) return
+          if (data.error) { errorsRef.current.wind = data.error; setStatus('wind', 'error') }
+          else { windRef.current = data; setStatus('wind', 'done') }
+        })
+        .catch(e => { if (!cancelled) { errorsRef.current.wind = e.message; setStatus('wind', 'error') } })
+
       // Narrative waits for OSM + weather + lands
       await Promise.allSettled([osmP, weatherP, landsP])
       if (cancelled) return
@@ -226,8 +237,8 @@ export default function ProcessingPage() {
         })
         .catch(e => { if (!cancelled) { errorsRef.current.narrative = e.message; setNarrativeStatus('error') } })
 
-      // Wait for coverage before finalizing
-      await coverageP
+      // Wait for coverage + wind before finalizing
+      await Promise.allSettled([coverageP, windP])
       if (cancelled) return
 
       // Finalize
@@ -238,9 +249,10 @@ export default function ProcessingPage() {
         weather:   weatherRef.current  ?? defaultWeather,
         lands:     landsRef.current    ?? [],
         coverage:  coverageRef.current ?? [],
-        imagery:   [],
-        narrative: narrativeRef.current,
-        errors:    errorsRef.current,
+        imagery:    [],
+        narrative:  narrativeRef.current,
+        errors:     errorsRef.current,
+        wind_field: windRef.current ?? undefined,
       })
         .then(data => {
           if (cancelled) return

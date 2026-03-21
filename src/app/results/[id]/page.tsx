@@ -524,6 +524,7 @@ export default function ResultsPage() {
                 result={result}
                 activeLayers={activeLayers}
                 weatherSegments={displayWeather}
+                startHour={startHour}
                 hoverFrac={hoverFrac}
                 onHoverFrac={setHoverFrac}
                 className={styles.mapInner}

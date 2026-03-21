@@ -162,6 +162,23 @@ export interface RouteImage {
   source: 'mapillary'
 }
 
+// ─── Wind Field ───────────────────────────────────────────────────────────────
+
+export interface WindGridPoint {
+  lat: number
+  lng: number
+  hourly_u: number[]  // U component m/s (positive = eastward),  24 values, index = hour 0–23
+  hourly_v: number[]  // V component m/s (positive = northward), 24 values, index = hour 0–23
+}
+
+export interface WindField {
+  grid: WindGridPoint[]
+  grid_cols: number
+  grid_rows: number
+  bbox: [number, number, number, number]  // [minLng, minLat, maxLng, maxLat] of grid coverage
+  ride_date: string
+}
+
 // ─── Full Result ──────────────────────────────────────────────────────────────
 
 export interface ReconResult {
@@ -179,6 +196,7 @@ export interface ReconResult {
   imagery: RouteImage[]
   narrative: string
   errors: Record<string, string> // data source name → error message
+  wind_field?: WindField
 }
 
 // ─── API ──────────────────────────────────────────────────────────────────────
@@ -227,4 +245,5 @@ export interface FinalizeRequest {
   imagery: RouteImage[]
   narrative: string
   errors: Record<string, string>
+  wind_field?: WindField
 }

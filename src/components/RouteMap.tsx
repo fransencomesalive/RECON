@@ -1,7 +1,8 @@
 'use client'
 
 import { useEffect, useRef } from 'react'
-import type { CoverageConfidence, ReconResult, SurfaceType, WeatherRisk, WeatherSegment } from '@/lib/types'
+import type { CoverageConfidence, ReconResult, SurfaceType, WeatherSegment } from '@/lib/types'
+import { WindParticleSystem } from '@/lib/windParticles'
 
 // Mapbox is a large library — loaded dynamically to avoid SSR issues
 // and keep the initial bundle lean.
@@ -21,10 +22,44 @@ const SURFACE_COLOR: Record<SurfaceType, string> = {
   unknown: '#888888',
 }
 
-const WEATHER_COLOR: Record<WeatherRisk, string> = {
-  green: '#2d8a4e',
-  amber: '#fdb618',
-  red:   '#ed1c24',
+// Mirror the profile's interpolateWeather for temp_c
+function interpolateTemp(segs: WeatherSegment[], distKm: number): number {
+  if (!segs.length) return 15
+  if (segs.length === 1) return segs[0].temp_c
+  if (distKm <= segs[0].distance_km) return segs[0].temp_c
+  if (distKm >= segs[segs.length - 1].distance_km) return segs[segs.length - 1].temp_c
+  for (let i = 0; i < segs.length - 1; i++) {
+    if (distKm >= segs[i].distance_km && distKm <= segs[i + 1].distance_km) {
+      const t = (distKm - segs[i].distance_km) / (segs[i + 1].distance_km - segs[i].distance_km)
+      return segs[i].temp_c + t * (segs[i + 1].temp_c - segs[i].temp_c)
+    }
+  }
+  return segs[segs.length - 1].temp_c
+}
+
+// Build a Mapbox line-gradient expression with 20 stops — same resolution as the
+// profile's SVG linearGradient, producing a true smooth gradient along the line.
+// Requires the source to have lineMetrics: true.
+function buildWeatherGradientExpr(segs: WeatherSegment[], totalKm: number): unknown[] {
+  const expr: unknown[] = ['interpolate', ['linear'], ['line-progress']]
+  for (let i = 0; i < 20; i++) {
+    const frac = i / 19
+    expr.push(frac, tempToColor(interpolateTemp(segs, frac * totalKm)))
+  }
+  return expr
+}
+
+function tempToColor(tempC: number): string {
+  const f = tempC * 9 / 5 + 32
+  if (f <  25) return '#000000'
+  if (f <  35) return '#1a237e'
+  if (f <  45) return '#29b6f6'
+  if (f <  55) return '#26a69a'
+  if (f <  65) return '#1a7a35'
+  if (f <  75) return '#fdd835'
+  if (f <  85) return '#f77f00'
+  if (f <  95) return '#ed1c24'
+  return '#e040fb'
 }
 
 const COVERAGE_COLOR: Record<CoverageConfidence, string> = {
@@ -56,6 +91,7 @@ interface RouteMapProps {
   result:           ReconResult
   activeLayers:     Set<string>
   weatherSegments?: WeatherSegment[]  // client-computed time-aware override
+  startHour?:       number            // hour-of-day for wind particle field
   hoverFrac?:       number | null
   onHoverFrac?:     (frac: number | null) => void
   className?:       string
@@ -63,7 +99,7 @@ interface RouteMapProps {
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export default function RouteMap({ result, activeLayers, weatherSegments, hoverFrac, onHoverFrac, className }: RouteMapProps) {
+export default function RouteMap({ result, activeLayers, weatherSegments, startHour, hoverFrac, onHoverFrac, className }: RouteMapProps) {
   const containerRef       = useRef<HTMLDivElement>(null)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const mapRef             = useRef<any>(null)
@@ -79,6 +115,17 @@ export default function RouteMap({ result, activeLayers, weatherSegments, hoverF
   const scrubberMarkerRef  = useRef<any>(null)
   const onHoverFracRef     = useRef(onHoverFrac)
   useEffect(() => { onHoverFracRef.current = onHoverFrac }, [onHoverFrac])
+
+  const windCanvasRef    = useRef<HTMLCanvasElement | null>(null)
+  const windParticlesRef = useRef<WindParticleSystem | null>(null)
+  const windRafRef       = useRef<number>(0)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const windTickRef      = useRef<((...args: any[]) => void) | null>(null)
+  const startHourRef     = useRef<number>(startHour ?? 9)
+  useEffect(() => {
+    startHourRef.current = startHour ?? 9
+    windParticlesRef.current?.setHour(startHour ?? 9)
+  }, [startHour])
 
   // ── Init map ────────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -175,21 +222,14 @@ export default function RouteMap({ result, activeLayers, weatherSegments, hoverF
         // ── Weather segments ───────────────────────────────────────────────
         const weatherSegs = result.weather.segments
         if (weatherSegs.length > 0) {
-          const weatherFeatures = weatherSegs.map((seg, i, arr) => {
-            const fromFrac = i === 0 ? 0 : (arr[i - 1].distance_km / totalKm)
-            const toFrac   = i === arr.length - 1 ? 1 : (arr[i].distance_km + (arr[i + 1]?.distance_km ?? totalKm)) / 2 / totalKm
-            const fromIdx  = Math.floor(Math.min(fromFrac, 1) * (coords2d.length - 1))
-            const toIdx    = Math.min(Math.ceil(Math.min(toFrac, 1) * (coords2d.length - 1)), coords2d.length - 1)
-            return {
-              type: 'Feature' as const,
-              geometry: { type: 'LineString' as const, coordinates: coords2d.slice(fromIdx, toIdx + 1) },
-              properties: { risk: seg.risk, color: WEATHER_COLOR[seg.risk] },
-            }
-          })
-
           map.addSource('weather', {
-            type: 'geojson',
-            data: { type: 'FeatureCollection', features: weatherFeatures },
+            type:        'geojson',
+            lineMetrics: true,
+            data: {
+              type:     'Feature',
+              geometry: { type: 'LineString', coordinates: coords2d },
+              properties: {},
+            },
           })
 
           map.addLayer({
@@ -198,9 +238,11 @@ export default function RouteMap({ result, activeLayers, weatherSegments, hoverF
             source: 'weather',
             layout: { 'line-join': 'round', 'line-cap': 'round' },
             paint: {
-              'line-color':   ['get', 'color'],
-              'line-width':   6,
-              'line-opacity': 0.6,
+              'line-color':    '#888888',
+              'line-width':    6,
+              'line-opacity':  0.6,
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              'line-gradient': buildWeatherGradientExpr(weatherSegs, totalKm) as any,
             },
           })
         }
@@ -438,12 +480,47 @@ export default function RouteMap({ result, activeLayers, weatherSegments, hoverF
         for (const el of poiMarkersRef.current) el.style.display = poiVis
         const bailoutVis = initLayers.has('Bailouts') ? 'block' : 'none'
         for (const el of bailoutMarkersRef.current) el.style.display = bailoutVis
+
+        // ── Wind particle canvas ───────────────────────────────────────────
+        if (result.wind_field && containerRef.current) {
+          const windCanvas = document.createElement('canvas')
+          windCanvas.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;pointer-events:none;'
+          containerRef.current.appendChild(windCanvas)
+          windCanvasRef.current = windCanvas
+
+          const sys = new WindParticleSystem(result.wind_field)
+          sys.setHour(startHourRef.current)
+          windParticlesRef.current = sys
+
+          // Define the reusable tick and store it so the activeLayers effect can start/stop it
+          const tick = () => {
+            const canvas = windCanvasRef.current
+            if (!canvas) return
+            const { width, height } = canvas.getBoundingClientRect()
+            if (canvas.width !== width || canvas.height !== height) {
+              canvas.width = width; canvas.height = height
+            }
+            const ctx = canvas.getContext('2d')
+            if (ctx) { sys.tick(map); sys.draw(ctx, map) }
+            windRafRef.current = requestAnimationFrame(tick)
+          }
+          windTickRef.current = tick
+
+          if (initLayers.has('Weather')) {
+            windRafRef.current = requestAnimationFrame(tick)
+          }
+        }
       })
 
       mapRef.current = map
     })
 
     return () => {
+      cancelAnimationFrame(windRafRef.current)
+      windParticlesRef.current?.destroy()
+      windParticlesRef.current = null
+      windCanvasRef.current?.remove()
+      windCanvasRef.current = null
       mapRef.current?.remove()
       mapRef.current = null
     }
@@ -484,6 +561,15 @@ export default function RouteMap({ result, activeLayers, weatherSegments, hoverF
     for (const el of bailoutMarkersRef.current) {
       el.style.display = bailoutDisplay
     }
+
+    // Wind particles — start/stop with Weather toggle
+    cancelAnimationFrame(windRafRef.current)
+    const canvas = windCanvasRef.current
+    if (activeLayers.has('Weather') && windTickRef.current) {
+      windRafRef.current = requestAnimationFrame(windTickRef.current)
+    } else if (canvas) {
+      canvas.getContext('2d')?.clearRect(0, 0, canvas.width, canvas.height)
+    }
   }, [activeLayers])
 
   // ── Scrubber marker position ─────────────────────────────────────────────
@@ -504,27 +590,12 @@ export default function RouteMap({ result, activeLayers, weatherSegments, hoverF
   useEffect(() => {
     const map = mapRef.current
     if (!map || !map.isStyleLoaded?.() || !weatherSegments) return
-    const source = map.getSource('weather')
-    if (!source) return
+    if (!map.getLayer('weather-line')) return
 
-    const coords    = (result.route.geometry.coordinates as [number, number, number?][]).map(c => [c[0], c[1]] as [number, number])
-    const totalKm   = result.route.distance_km
-
-    const features = weatherSegments.map((seg, i, arr) => {
-      const fromFrac = i === 0 ? 0 : arr[i - 1].distance_km / totalKm
-      const toFrac   = i === arr.length - 1 ? 1 : (arr[i].distance_km + (arr[i + 1]?.distance_km ?? totalKm)) / 2 / totalKm
-      const fromIdx  = Math.floor(Math.min(fromFrac, 1) * (coords.length - 1))
-      const toIdx    = Math.min(Math.ceil(Math.min(toFrac, 1) * (coords.length - 1)), coords.length - 1)
-      return {
-        type: 'Feature' as const,
-        geometry: { type: 'LineString' as const, coordinates: coords.slice(fromIdx, toIdx + 1) },
-        properties: { risk: seg.risk, color: WEATHER_COLOR[seg.risk] },
-      }
-    })
-
+    const totalKm = result.route.distance_km
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    ;(source as any).setData({ type: 'FeatureCollection', features })
+    map.setPaintProperty('weather-line', 'line-gradient', buildWeatherGradientExpr(weatherSegments, totalKm) as any)
   }, [weatherSegments, result])
 
-  return <div ref={containerRef} className={className} style={{ width: '100%', height: '100%' }} />
+  return <div ref={containerRef} className={className} style={{ width: '100%', height: '100%', position: 'relative' }} />
 }

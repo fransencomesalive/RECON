@@ -6,7 +6,7 @@ export const maxDuration = 15
 export async function POST(req: Request) {
   try {
     const body: FinalizeRequest = await req.json()
-    const { id, osm, weather, lands, coverage, imagery, narrative, errors } = body
+    const { id, osm, weather, lands, coverage, imagery, narrative, errors, wind_field } = body
 
     if (!id) return Response.json({ error: 'Missing id.' }, { status: 400 })
 
@@ -28,6 +28,7 @@ export async function POST(req: Request) {
       imagery,
       narrative,
       errors,
+      wind_field,
     }
 
     await storeResult(result)
