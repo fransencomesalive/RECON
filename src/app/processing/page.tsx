@@ -113,7 +113,7 @@ export default function ProcessingPage() {
   useEffect(() => {
     const fileData = sessionStorage.getItem('recon_file_data')
     const fileName = sessionStorage.getItem('recon_file_name')
-    const rideDate = sessionStorage.getItem('recon_ride_date') ?? new Date().toISOString().split('T')[0]
+    const rideDate = sessionStorage.getItem('recon_ride_date') ?? new Date(Date.now() + 86400000).toISOString().split('T')[0]
     const routeUrl = sessionStorage.getItem('recon_route_url')
 
     if (!fileData && !routeUrl) {

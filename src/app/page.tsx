@@ -87,8 +87,8 @@ export default function ReconPage() {
 
   const [url, setUrl] = useState('')
 
-  const todayISO = new Date().toISOString().split('T')[0]
-  const [rideDate, setRideDate]       = useState(todayISO)
+  const tomorrowISO = new Date(Date.now() + 86400000).toISOString().split('T')[0]
+  const [rideDate, setRideDate]       = useState(tomorrowISO)
   const [dateWarning, setDateWarning] = useState(false)
 
   const router = useRouter()

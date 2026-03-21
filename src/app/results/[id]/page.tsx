@@ -5,7 +5,7 @@ import { useParams } from 'next/navigation'
 import Image from 'next/image'
 import dynamic from 'next/dynamic'
 import styles from '../results.module.css'
-import type { BailoutRoute, ReconResult, SurfaceType, WeatherRisk, WeatherSegment } from '@/lib/types'
+import type { BailoutRoute, ReconResult, SurfaceType, WeatherSegment } from '@/lib/types'
 
 const RouteMap = dynamic(() => import('@/components/RouteMap'), { ssr: false })
 
@@ -51,13 +51,18 @@ function drawMesh(ctx: CanvasRenderingContext2D, nodes: MeshNode[], W: number, H
 // ─── Elevation SVG helpers ────────────────────────────────────────────────────
 
 const SVG_W     = 800
-const SVG_H     = 304
-const WEATHER_H = 20
+const SVG_H     = 362
+const WEATHER_H = 10
 const CHART_L   = 10, CHART_R = 790
 // 5 lanes × 24px each (4 POI + 1 bailout), plus 10px gap before chart
 const CHART_T        = WEATHER_H + 5 * 24 + 10   // = 150
 const CHART_B        = 294
 const BAILOUT_LANE_Y = WEATHER_H + 18 + 4 * 24   // = 134 (bottom lane)
+// Weather strip positions — below the elevation baseline
+const N_WTHR = 120            // rendering resolution
+const WIND_Y = CHART_B + 14  // 308 — wind strip centerline
+const RAIN_Y = CHART_B + 33  // 327 — rain strip centerline
+const TEMP_Y = CHART_B + 52  // 346 — temp strip centerline
 
 // Vertical lane per POI type: 0 = top (emergency), 3 = bottom (water)
 const POI_LANE: Record<string, number> = {
@@ -123,12 +128,53 @@ const SURFACE_DASH: Record<SurfaceType, string | undefined> = {
   unknown: '10 6',
 }
 
-const WEATHER_COLOR: Record<WeatherRisk, string> = {
-  green: '#2d8a4e',
-  amber: '#fdb618',
-  red:   '#ed1c24',
+function interpolateWeather(
+  segs: WeatherSegment[],
+  distKm: number,
+  key: 'wind_speed_kph' | 'precipitation_chance' | 'temp_c',
+): number {
+  const val = (s: WeatherSegment) =>
+    key === 'wind_speed_kph' ? s.wind_speed_kph
+    : key === 'precipitation_chance' ? s.precipitation_chance
+    : s.temp_c
+  if (!segs.length) return 0
+  if (segs.length === 1) return val(segs[0])
+  if (distKm <= segs[0].distance_km) return val(segs[0])
+  if (distKm >= segs[segs.length - 1].distance_km) return val(segs[segs.length - 1])
+  for (let i = 0; i < segs.length - 1; i++) {
+    if (distKm >= segs[i].distance_km && distKm <= segs[i + 1].distance_km) {
+      const t = (distKm - segs[i].distance_km) / (segs[i + 1].distance_km - segs[i].distance_km)
+      return val(segs[i]) + t * (val(segs[i + 1]) - val(segs[i]))
+    }
+  }
+  return val(segs[segs.length - 1])
 }
 
+function tempToColor(tempC: number): string {
+  const f = tempC * 9 / 5 + 32
+  if (f <  25) return '#000000'  // extreme cold — black
+  if (f <  35) return '#1a237e'  // very cold    — dark blue
+  if (f <  45) return '#29b6f6'  // cold         — sky blue
+  if (f <  55) return '#26a69a'  // cool         — blue-green
+  if (f <  65) return '#66bb6a'  // mild         — green
+  if (f <  75) return '#fdd835'  // comfortable  — yellow
+  if (f <  85) return '#f77f00'  // warm         — amber
+  if (f <  95) return '#ed1c24'  // hot          — red
+  return '#e040fb'               // extreme heat — magenta
+}
+
+function makeRainPath(centerY: number, halfH: number, amp: number, wlen: number): string {
+  const W = CHART_R - CHART_L
+  const pts: string[] = []
+  for (let px = 0; px <= W * 2; px += 2) {
+    const y = centerY - halfH + amp * Math.sin(2 * Math.PI * px / wlen)
+    pts.push(`${pts.length === 0 ? 'M' : 'L'} ${px.toFixed(1)},${y.toFixed(1)}`)
+  }
+  pts.push(`L ${(W * 2).toFixed(1)},${(centerY + halfH).toFixed(1)}`)
+  pts.push(`L 0,${(centerY + halfH).toFixed(1)}`)
+  pts.push('Z')
+  return pts.join(' ')
+}
 
 function poiSymbol(poi: { type: string; potable?: boolean; note?: string }): string {
   switch (poi.type) {
@@ -212,6 +258,7 @@ export default function ResultsPage() {
   const [speedKph,     setSpeedKph]     = useState(16 / 0.621371)  // 16 mph default
   const [startHour,    setStartHour]    = useState(9)
   const [hoverFrac,    setHoverFrac]    = useState<number | null>(null)
+  const [hoverSvgY,    setHoverSvgY]    = useState<number | null>(null)
 
   // ── Fetch result ──────────────────────────────────────────────────────────
   useEffect(() => {
@@ -280,10 +327,12 @@ export default function ResultsPage() {
   const handleElevMouseMove = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
     const rect = e.currentTarget.getBoundingClientRect()
     const svgX = ((e.clientX - rect.left) / rect.width) * SVG_W
+    const svgY = ((e.clientY - rect.top)  / rect.height) * SVG_H
     setHoverFrac(Math.max(0, Math.min(1, (svgX - CHART_L) / (CHART_R - CHART_L))))
+    setHoverSvgY(svgY)
   }, [])
 
-  const handleElevMouseLeave = useCallback(() => setHoverFrac(null), [])
+  const handleElevMouseLeave = useCallback(() => { setHoverFrac(null); setHoverSvgY(null) }, [])
 
   const toggleLayer = useCallback((layer: string) => {
     setActiveLayers(prev => {
@@ -361,12 +410,16 @@ export default function ResultsPage() {
     : `${speedKph} km/h`
   const startTimeStr = `${String(startHour).padStart(2, '0')}:00`
 
-  // Weather zones mapped to route fraction
-  const weatherZones = displayWeather.map((seg, i, arr) => ({
-    from: i === 0 ? 0 : arr[i - 1].distance_km / route.distance_km,
-    to:   i === arr.length - 1 ? 1 : (arr[i].distance_km + arr[i + 1].distance_km) / 2 / route.distance_km,
-    status: seg.risk,
-  }))
+  // Weather strip parameters — react live to speed + start-time sliders via displayWeather
+  const maxWindKph = displayWeather.length ? Math.max(...displayWeather.map(s => s.wind_speed_kph)) : 0
+  const maxPrecip  = displayWeather.length ? Math.max(...displayWeather.map(s => s.precipitation_chance)) : 0
+  const precipFrac = maxPrecip / 100
+  const windFrac   = Math.min(maxWindKph / 60, 1)               // cap at 60 kph ≈ 37 mph
+  const rainHalfH  = (3 + precipFrac * 12) / 2                  // 1.5–7.5px half-height
+  const waveAmp    = precipFrac * 4 + precipFrac * windFrac * 3  // 0–7px; rain+wind combo boosts waviness
+  const waveLen    = Math.max(40, 80 - windFrac * 40)            // 80px calm → 40px windy
+  const waveDur    = Math.max(1.5, 3 - windFrac * 1.5)           // 3s calm → 1.5s windy
+  const rainPath   = displayWeather.length > 0 ? makeRainPath(RAIN_Y, rainHalfH, waveAmp, waveLen) : ''
 
   // POI proximity filter: per lane, enforce ≥40 SVG units between markers
   const MIN_POI_SPACING = 40 // SVG units
@@ -389,6 +442,22 @@ export default function ResultsPage() {
   const TIP_W = 160, TIP_H = 22
   const hoverTipX = hoverX != null ? (hoverX + TIP_W + 16 > CHART_R ? hoverX - TIP_W - 8 : hoverX + 8) : null
   const hoverTipY = hoverY != null ? Math.max(CHART_T + 4, Math.min(CHART_B - TIP_H - 4, hoverY - TIP_H / 2)) : null
+
+  // Strip hover — zone detection + per-strip values at current x position
+  const STRIP_TOL  = 14
+  const hoverZone  = hoverSvgY == null ? null
+    : hoverSvgY >= CHART_T && hoverSvgY <= CHART_B              ? 'elev'
+    : Math.abs(hoverSvgY - WIND_Y) < STRIP_TOL                  ? 'wind'
+    : Math.abs(hoverSvgY - RAIN_Y) < STRIP_TOL                  ? 'rain'
+    : Math.abs(hoverSvgY - TEMP_Y) < STRIP_TOL                  ? 'temp'
+    : 'none'
+  const windAtHover = hoverPt && displayWeather.length > 0 ? interpolateWeather(displayWeather, hoverPt.dist, 'wind_speed_kph')        : null
+  const rainAtHover = hoverPt && displayWeather.length > 0 ? interpolateWeather(displayWeather, hoverPt.dist, 'precipitation_chance')   : null
+  const tempAtHover = hoverPt && displayWeather.length > 0 ? interpolateWeather(displayWeather, hoverPt.dist, 'temp_c')                 : null
+  const windLabel   = windAtHover != null ? (unit === 'imperial' ? `${(windAtHover * 0.621371).toFixed(0)} mph` : `${windAtHover.toFixed(0)} km/h`) : null
+  const rainLabel   = rainAtHover != null ? `${rainAtHover.toFixed(0)}% precip` : null
+  const tempLabel   = tempAtHover != null ? (unit === 'imperial' ? `${(tempAtHover * 9 / 5 + 32).toFixed(0)}°F` : `${tempAtHover.toFixed(0)}°C`) : null
+  const hoverLineBottom = activeLayers.has('Weather') && displayWeather.length > 0 ? TEMP_Y + 8 : CHART_B
 
   return (
     <main className={styles.root}>
@@ -504,23 +573,19 @@ export default function ResultsPage() {
                 <pattern id="weatherHatchRed" patternUnits="userSpaceOnUse" width="8" height="8" patternTransform="rotate(45)">
                   <line x1="0" y1="0" x2="0" y2="8" stroke="rgba(237,28,36,0.3)" strokeWidth="3" />
                 </pattern>
+                <clipPath id="weatherClip">
+                  <rect x={CHART_L} y={0} width={CHART_R - CHART_L} height={SVG_H} />
+                </clipPath>
+                {displayWeather.length > 0 && (
+                  <linearGradient id="tempGrad" x1="0" x2="1">
+                    {Array.from({ length: 20 }, (_, i) => {
+                      const frac = i / 19
+                      const temp = interpolateWeather(displayWeather, frac * route.distance_km, 'temp_c')
+                      return <stop key={i} offset={`${(frac * 100).toFixed(1)}%`} stopColor={tempToColor(temp)} />
+                    })}
+                  </linearGradient>
+                )}
               </defs>
-
-              {/* Weather zones */}
-              {activeLayers.has('Weather') && weatherZones.map((z, i) => {
-                const x1 = CHART_L + z.from * (CHART_R - CHART_L)
-                const x2 = CHART_L + z.to   * (CHART_R - CHART_L)
-                const color = WEATHER_COLOR[z.status]
-                const hatchFill = z.status === 'red' ? 'url(#weatherHatchRed)' : z.status === 'amber' ? 'url(#weatherHatchAmber)' : null
-                return (
-                  <g key={i}>
-                    {/* Solid color band at top for all risk levels */}
-                    <rect x={x1} y={0} width={x2 - x1} height={WEATHER_H} fill={color} opacity={z.status === 'green' ? 0.35 : 0.7} />
-                    {/* Hatching over elevation fill for amber/red only */}
-                    {hatchFill && <rect x={x1} y={CHART_T} width={x2 - x1} height={CHART_B - CHART_T} fill={hatchFill} opacity="0.35" />}
-                  </g>
-                )
-              })}
 
               {/* Surface fills */}
               {surfaceGroups.map((seg, i) => (
@@ -577,19 +642,105 @@ export default function ResultsPage() {
               {/* Baseline */}
               <line x1={CHART_L} y1={CHART_B} x2={CHART_R} y2={CHART_B} stroke="rgba(1,106,125,0.3)" strokeWidth="1" />
 
+              {/* ── Weather strips: Wind / Rain / Temp ── */}
+              {/* All three react live to speed + start-time sliders via displayWeather */}
+              {activeLayers.has('Weather') && displayWeather.length > 0 && (
+                <>
+                  {/* Wind — variable-thickness gray stroke, scaled to max wind on route */}
+                  <g clipPath="url(#weatherClip)">
+                    {Array.from({ length: N_WTHR }, (_, i) => {
+                      const frac   = i / (N_WTHR - 1)
+                      const distKm = frac * route.distance_km
+                      const wind   = interpolateWeather(displayWeather, distKm, 'wind_speed_kph')
+                      const h      = maxWindKph > 0 ? 3 + (wind / maxWindKph) * 12 : 3
+                      const x      = CHART_L + frac * (CHART_R - CHART_L)
+                      const w      = (CHART_R - CHART_L) / N_WTHR + 0.5
+                      return <rect key={i} x={x} y={WIND_Y - h / 2} width={w} height={h} fill="rgba(170,170,170,0.75)" />
+                    })}
+                  </g>
+
+                  {/* Rain — animated water-depth wave. depth = precip intensity; waviness = precip × wind combo */}
+                  {rainPath && (
+                    <g clipPath="url(#weatherClip)">
+                      <g transform={`translate(${CHART_L},0)`}>
+                        <g>
+                          <animateTransform
+                            attributeName="transform"
+                            attributeType="XML"
+                            type="translate"
+                            from="0,0"
+                            to={`${-(CHART_R - CHART_L)},0`}
+                            dur={`${waveDur.toFixed(2)}s`}
+                            repeatCount="indefinite"
+                          />
+                          <path d={rainPath} fill="rgba(99,179,237,0.55)" />
+                        </g>
+                      </g>
+                    </g>
+                  )}
+
+                  {/* Temp — 5px smooth gradient bar */}
+                  <rect x={CHART_L} y={TEMP_Y - 2.5} width={CHART_R - CHART_L} height={5}
+                    fill="url(#tempGrad)" opacity={0.9} rx={2} />
+                </>
+              )}
+
               {/* ── Hover scrubber overlay ── */}
-              {hoverX != null && hoverY != null && hoverPt != null && hoverTipX != null && hoverTipY != null && (
+              {hoverX != null && hoverPt != null && (
                 <g pointerEvents="none">
-                  <line x1={hoverX} y1={0} x2={hoverX} y2={CHART_B} stroke="rgba(253,182,24,0.45)" strokeWidth="1" />
-                  <circle cx={hoverX} cy={hoverY} r="4" fill="#fdb618" stroke="#011c24" strokeWidth="1.5" />
-                  <rect x={hoverTipX} y={hoverTipY} width={TIP_W} height={TIP_H} rx="3"
-                    fill="rgba(1,28,36,0.92)" stroke="#016a7d" strokeWidth="0.5" />
-                  <text x={hoverTipX + TIP_W / 2} y={hoverTipY + 14}
-                    textAnchor="middle" fill="#fdb618" fontSize="11" fontFamily="monospace">
-                    {unit === 'imperial'
-                      ? `${(hoverPt.dist * 0.621371).toFixed(1)} mi  ·  ${hoverPt.elev.toFixed(0)} ft`
-                      : `${hoverPt.dist.toFixed(1)} km  ·  ${(hoverPt.elev / 3.28084).toFixed(0)} m`}
-                  </text>
+                  {/* Vertical line — extends through weather strips when visible */}
+                  <line x1={hoverX} y1={0} x2={hoverX} y2={hoverLineBottom}
+                    stroke="rgba(253,182,24,0.45)" strokeWidth="1" />
+
+                  {/* Elevation dot + tooltip — show when not hovering a weather strip */}
+                  {hoverY != null && hoverTipX != null && hoverTipY != null &&
+                   hoverZone !== 'wind' && hoverZone !== 'rain' && hoverZone !== 'temp' && (
+                    <>
+                      <circle cx={hoverX} cy={hoverY} r="4" fill="#fdb618" stroke="#011c24" strokeWidth="1.5" />
+                      <rect x={hoverTipX} y={hoverTipY} width={TIP_W} height={TIP_H} rx="3"
+                        fill="rgba(1,28,36,0.92)" stroke="#016a7d" strokeWidth="0.5" />
+                      <text x={hoverTipX + TIP_W / 2} y={hoverTipY + 14}
+                        textAnchor="middle" fill="#fdb618" fontSize="11" fontFamily="monospace">
+                        {unit === 'imperial'
+                          ? `${(hoverPt.dist * 0.621371).toFixed(1)} mi  ·  ${hoverPt.elev.toFixed(0)} ft`
+                          : `${hoverPt.dist.toFixed(1)} km  ·  ${(hoverPt.elev / 3.28084).toFixed(0)} m`}
+                      </text>
+                    </>
+                  )}
+
+                  {/* Weather strip dots + tooltips */}
+                  {activeLayers.has('Weather') && displayWeather.length > 0 && hoverTipX != null && (
+                    <>
+                      <circle cx={hoverX} cy={WIND_Y} r="3" fill="rgba(210,210,210,0.9)" stroke="#011c24" strokeWidth="1" />
+                      <circle cx={hoverX} cy={RAIN_Y} r="3" fill="rgba(99,179,237,0.9)"  stroke="#011c24" strokeWidth="1" />
+                      <circle cx={hoverX} cy={TEMP_Y} r="3"
+                        fill={tempAtHover != null ? tempToColor(tempAtHover) : '#888'} stroke="#011c24" strokeWidth="1" />
+                      {hoverZone === 'wind' && windLabel && (
+                        <>
+                          <rect x={hoverTipX} y={WIND_Y - TIP_H - 4} width={TIP_W} height={TIP_H} rx="3"
+                            fill="rgba(1,28,36,0.92)" stroke="#016a7d" strokeWidth="0.5" />
+                          <text x={hoverTipX + TIP_W / 2} y={WIND_Y - TIP_H - 4 + 14}
+                            textAnchor="middle" fill="#fdb618" fontSize="11" fontFamily="monospace">{windLabel}</text>
+                        </>
+                      )}
+                      {hoverZone === 'rain' && rainLabel && (
+                        <>
+                          <rect x={hoverTipX} y={RAIN_Y - TIP_H - 4} width={TIP_W} height={TIP_H} rx="3"
+                            fill="rgba(1,28,36,0.92)" stroke="#016a7d" strokeWidth="0.5" />
+                          <text x={hoverTipX + TIP_W / 2} y={RAIN_Y - TIP_H - 4 + 14}
+                            textAnchor="middle" fill="#fdb618" fontSize="11" fontFamily="monospace">{rainLabel}</text>
+                        </>
+                      )}
+                      {hoverZone === 'temp' && tempLabel && (
+                        <>
+                          <rect x={hoverTipX} y={TEMP_Y - TIP_H - 4} width={TIP_W} height={TIP_H} rx="3"
+                            fill="rgba(1,28,36,0.92)" stroke="#016a7d" strokeWidth="0.5" />
+                          <text x={hoverTipX + TIP_W / 2} y={TEMP_Y - TIP_H - 4 + 14}
+                            textAnchor="middle" fill="#fdb618" fontSize="11" fontFamily="monospace">{tempLabel}</text>
+                        </>
+                      )}
+                    </>
+                  )}
                 </g>
               )}
             </svg>
@@ -617,12 +768,21 @@ export default function ResultsPage() {
                   ))}
                 </div>
               </div>
-              {activeLayers.has('Weather') && weatherZones.length > 0 && (
+              {activeLayers.has('Weather') && displayWeather.length > 0 && (
                 <div className={styles.legendRow}>
                   <span className={styles.legendTitle}>Weather</span>
-                  <span className={styles.legendItem}><span style={{ display: 'inline-block', width: 12, height: 12, borderRadius: 2, background: WEATHER_COLOR.green, opacity: 0.8 }} /> Clear</span>
-                  <span className={styles.legendItem}><span style={{ display: 'inline-block', width: 12, height: 12, borderRadius: 2, background: WEATHER_COLOR.amber, opacity: 0.8 }} /> Caution</span>
-                  <span className={styles.legendItem}><span style={{ display: 'inline-block', width: 12, height: 12, borderRadius: 2, background: WEATHER_COLOR.red, opacity: 0.8 }} /> Danger</span>
+                  <span className={styles.legendItem}>
+                    <svg width="28" height="10" style={{ verticalAlign: 'middle' }}><line x1="0" y1="5" x2="28" y2="5" stroke="rgba(170,170,170,0.85)" strokeWidth="5" strokeLinecap="round" /></svg> Wind
+                  </span>
+                  <span className={styles.legendItem}>
+                    <svg width="28" height="10" style={{ verticalAlign: 'middle' }}><rect x="0" y="2" width="28" height="6" fill="rgba(99,179,237,0.55)" rx="2" /></svg> Rain
+                  </span>
+                  <span className={styles.legendItem}>
+                    <svg width="60" height="10" style={{ verticalAlign: 'middle' }}>
+                      <defs><linearGradient id="tLegGrad" x1="0" x2="1"><stop offset="0%" stopColor="#1a237e"/><stop offset="25%" stopColor="#26a69a"/><stop offset="50%" stopColor="#fdd835"/><stop offset="75%" stopColor="#f77f00"/><stop offset="100%" stopColor="#e040fb"/></linearGradient></defs>
+                      <rect x="0" y="2.5" width="60" height="5" fill="url(#tLegGrad)" rx="1" />
+                    </svg> Temp
+                  </span>
                 </div>
               )}
             </div>
