@@ -56,12 +56,14 @@ interface RouteMapProps {
   result:           ReconResult
   activeLayers:     Set<string>
   weatherSegments?: WeatherSegment[]  // client-computed time-aware override
+  hoverFrac?:       number | null
+  onHoverFrac?:     (frac: number | null) => void
   className?:       string
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export default function RouteMap({ result, activeLayers, weatherSegments, className }: RouteMapProps) {
+export default function RouteMap({ result, activeLayers, weatherSegments, hoverFrac, onHoverFrac, className }: RouteMapProps) {
   const containerRef       = useRef<HTMLDivElement>(null)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const mapRef             = useRef<any>(null)
@@ -72,6 +74,11 @@ export default function RouteMap({ result, activeLayers, weatherSegments, classN
   // Ref so the async map load callback can read the current activeLayers
   const activeLayersRef    = useRef<Set<string>>(activeLayers)
   useEffect(() => { activeLayersRef.current = activeLayers }, [activeLayers])
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const scrubberMarkerRef  = useRef<any>(null)
+  const onHoverFracRef     = useRef(onHoverFrac)
+  useEffect(() => { onHoverFracRef.current = onHoverFrac }, [onHoverFrac])
 
   // ── Init map ────────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -381,6 +388,34 @@ export default function RouteMap({ result, activeLayers, weatherSegments, classN
           .setPopup(new mapboxgl.Popup().setHTML('<div style="font-family:monospace;font-size:12px">Finish</div>'))
           .addTo(map)
 
+        // ── Elevation scrubber marker ──────────────────────────────────────
+        const scrubEl = document.createElement('div')
+        scrubEl.textContent = '🥑'
+        scrubEl.style.cssText = 'font-size:22px;line-height:1;pointer-events:none;display:none;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.7));transform:translate(-50%,-50%);'
+        const scrubMarker = new mapboxgl.Marker({ element: scrubEl })
+          .setLngLat(coords2d[0])
+          .addTo(map)
+        scrubberMarkerRef.current = scrubMarker
+
+        // ── Route hover → send fraction to elevation profile ──────────────
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        map.on('mousemove', 'route-line', (e: any) => {
+          const { lng, lat } = e.lngLat
+          let minDist = Infinity, nearestIdx = 0
+          for (let i = 0; i < coords2d.length; i++) {
+            const dx = coords2d[i][0] - lng
+            const dy = coords2d[i][1] - lat
+            const d = dx * dx + dy * dy
+            if (d < minDist) { minDist = d; nearestIdx = i }
+          }
+          onHoverFracRef.current?.(nearestIdx / (coords2d.length - 1))
+          map.getCanvas().style.cursor = 'crosshair'
+        })
+        map.on('mouseleave', 'route-line', () => {
+          onHoverFracRef.current?.(null)
+          map.getCanvas().style.cursor = ''
+        })
+
         // ── Sync initial layer visibility to activeLayers state ────────────
         // Layers are visible by default when added — apply the current toggle
         // state so the map matches the UI buttons on first load.
@@ -450,6 +485,18 @@ export default function RouteMap({ result, activeLayers, weatherSegments, classN
       el.style.display = bailoutDisplay
     }
   }, [activeLayers])
+
+  // ── Scrubber marker position ─────────────────────────────────────────────
+  useEffect(() => {
+    const marker = scrubberMarkerRef.current
+    if (!marker) return
+    const el = marker.getElement() as HTMLElement
+    if (hoverFrac == null) { el.style.display = 'none'; return }
+    const coords = (result.route.geometry.coordinates as [number, number, number?][]).map(c => [c[0], c[1]] as [number, number])
+    const idx = Math.round(Math.max(0, Math.min(hoverFrac, 1)) * (coords.length - 1))
+    marker.setLngLat(coords[idx])
+    el.style.display = 'block'
+  }, [hoverFrac, result])
 
   // ── Live weather update ──────────────────────────────────────────────────
   // When the parent re-derives weather segments (speed/start-time change),

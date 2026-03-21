@@ -211,6 +211,7 @@ export default function ResultsPage() {
   const [rideDate,     setRideDate]     = useState('')
   const [speedKph,     setSpeedKph]     = useState(16 / 0.621371)  // 16 mph default
   const [startHour,    setStartHour]    = useState(9)
+  const [hoverFrac,    setHoverFrac]    = useState<number | null>(null)
 
   // ── Fetch result ──────────────────────────────────────────────────────────
   useEffect(() => {
@@ -275,6 +276,14 @@ export default function ResultsPage() {
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
   }, [])
+
+  const handleElevMouseMove = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect()
+    const svgX = ((e.clientX - rect.left) / rect.width) * SVG_W
+    setHoverFrac(Math.max(0, Math.min(1, (svgX - CHART_L) / (CHART_R - CHART_L))))
+  }, [])
+
+  const handleElevMouseLeave = useCallback(() => setHoverFrac(null), [])
 
   const toggleLayer = useCallback((layer: string) => {
     setActiveLayers(prev => {
@@ -372,6 +381,15 @@ export default function ResultsPage() {
     })
   })()
 
+  // ── Hover scrubber (elevation ↔ map sync) ───────────────────────────────────
+  const hoverIdx  = hoverFrac != null ? Math.round(Math.max(0, Math.min(hoverFrac, 1)) * (elevData.length - 1)) : null
+  const hoverPt   = hoverIdx != null ? (elevData[hoverIdx] ?? null) : null
+  const hoverX    = hoverFrac != null ? CHART_L + hoverFrac * (CHART_R - CHART_L) : null
+  const hoverY    = hoverPt ? toY(hoverPt.elev) : null
+  const TIP_W = 160, TIP_H = 22
+  const hoverTipX = hoverX != null ? (hoverX + TIP_W + 16 > CHART_R ? hoverX - TIP_W - 8 : hoverX + 8) : null
+  const hoverTipY = hoverY != null ? Math.max(CHART_T + 4, Math.min(CHART_B - TIP_H - 4, hoverY - TIP_H / 2)) : null
+
   return (
     <main className={styles.root}>
       <canvas ref={bgRef}    className={styles.bgCanvas} />
@@ -437,6 +455,8 @@ export default function ResultsPage() {
                 result={result}
                 activeLayers={activeLayers}
                 weatherSegments={displayWeather}
+                hoverFrac={hoverFrac}
+                onHoverFrac={setHoverFrac}
                 className={styles.mapInner}
               />
             )}
@@ -467,7 +487,13 @@ export default function ResultsPage() {
               <span className={styles.sectionTitle}>Elevation Profile</span>
             </div>
 
-            <svg viewBox={`0 0 ${SVG_W} ${SVG_H}`} className={styles.elevSvg}>
+            <svg
+              viewBox={`0 0 ${SVG_W} ${SVG_H}`}
+              className={styles.elevSvg}
+              onMouseMove={handleElevMouseMove}
+              onMouseLeave={handleElevMouseLeave}
+              style={{ cursor: 'crosshair' }}
+            >
               <defs>
                 <pattern id="offRoadHatch" patternUnits="userSpaceOnUse" width="8" height="8" patternTransform="rotate(45)">
                   <line x1="0" y1="0" x2="0" y2="8" stroke="rgba(1,106,125,0.25)" strokeWidth="3" />
@@ -550,6 +576,22 @@ export default function ResultsPage() {
 
               {/* Baseline */}
               <line x1={CHART_L} y1={CHART_B} x2={CHART_R} y2={CHART_B} stroke="rgba(1,106,125,0.3)" strokeWidth="1" />
+
+              {/* ── Hover scrubber overlay ── */}
+              {hoverX != null && hoverY != null && hoverPt != null && hoverTipX != null && hoverTipY != null && (
+                <g pointerEvents="none">
+                  <line x1={hoverX} y1={0} x2={hoverX} y2={CHART_B} stroke="rgba(253,182,24,0.45)" strokeWidth="1" />
+                  <circle cx={hoverX} cy={hoverY} r="4" fill="#fdb618" stroke="#011c24" strokeWidth="1.5" />
+                  <rect x={hoverTipX} y={hoverTipY} width={TIP_W} height={TIP_H} rx="3"
+                    fill="rgba(1,28,36,0.92)" stroke="#016a7d" strokeWidth="0.5" />
+                  <text x={hoverTipX + TIP_W / 2} y={hoverTipY + 14}
+                    textAnchor="middle" fill="#fdb618" fontSize="11" fontFamily="monospace">
+                    {unit === 'imperial'
+                      ? `${(hoverPt.dist * 0.621371).toFixed(1)} mi  ·  ${hoverPt.elev.toFixed(0)} ft`
+                      : `${hoverPt.dist.toFixed(1)} km  ·  ${(hoverPt.elev / 3.28084).toFixed(0)} m`}
+                  </text>
+                </g>
+              )}
             </svg>
 
             {/* Legend */}
