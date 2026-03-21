@@ -535,7 +535,7 @@ export default function ResultsPage() {
 
         {/* ── Layer toggles — centered between map and elevation ── */}
         <div className={styles.layerToggles}>
-          {['Route', 'Surface', 'Weather', 'Public Lands', 'Mobile Coverage', 'POIs', 'Bailouts'].map(layer => (
+          {['Route', 'Surface', 'Weather', 'Public Lands', 'Mobile Coverage', 'POIs', 'Bailouts', 'Imagery'].map(layer => (
             <button
               key={layer}
               className={[styles.pill, activeLayers.has(layer) ? styles.pillActive : ''].join(' ')}

@@ -11,7 +11,7 @@ const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN ?? ''
 
 // ─── Layer visibility config ─────────────────────────────────────────────────
 
-export type MapLayer = 'Route' | 'Surface' | 'Weather' | 'Public Lands' | 'Mobile Coverage' | 'POIs'
+export type MapLayer = 'Route' | 'Surface' | 'Weather' | 'Public Lands' | 'Mobile Coverage' | 'POIs' | 'Imagery'
 
 // ─── Color helpers ────────────────────────────────────────────────────────────
 
@@ -107,6 +107,8 @@ export default function RouteMap({ result, activeLayers, weatherSegments, startH
   const poiMarkersRef      = useRef<any[]>([])
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const bailoutMarkersRef  = useRef<any[]>([])
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const imageryMarkersRef  = useRef<any[]>([])
   // Ref so the async map load callback can read the current activeLayers
   const activeLayersRef    = useRef<Set<string>>(activeLayers)
   useEffect(() => { activeLayersRef.current = activeLayers }, [activeLayers])
@@ -430,6 +432,27 @@ export default function RouteMap({ result, activeLayers, weatherSegments, startH
           .setPopup(new mapboxgl.Popup().setHTML('<div style="font-family:monospace;font-size:12px">Finish</div>'))
           .addTo(map)
 
+        // ── Imagery pins ───────────────────────────────────────────────────
+        const imageryMarkerEls: HTMLElement[] = []
+        for (const img of result.imagery ?? []) {
+          const el = document.createElement('div')
+          el.textContent = '📍'
+          el.style.cssText = 'font-size:24px;line-height:1;cursor:pointer;user-select:none;filter:drop-shadow(0 1px 3px rgba(0,0,0,0.55));'
+
+          new mapboxgl.Marker({ element: el })
+            .setLngLat([img.lng, img.lat])
+            .setPopup(new mapboxgl.Popup({ offset: 20, closeButton: false, maxWidth: '420px' }).setHTML(
+              `<div style="font-family:monospace;font-size:11px;color:#fdb618;background:#011c24;padding:6px;border-radius:3px;line-height:1.6">` +
+              `<img src="${img.thumb_url}" style="width:400px;height:auto;display:block;border-radius:2px;margin-bottom:4px" />` +
+              `📷 ${img.distance_km.toFixed(1)} km` +
+              `</div>`
+            ))
+            .addTo(map)
+
+          imageryMarkerEls.push(el)
+        }
+        imageryMarkersRef.current = imageryMarkerEls
+
         // ── Elevation scrubber marker ──────────────────────────────────────
         const scrubEl = document.createElement('div')
         scrubEl.textContent = '🥑'
@@ -480,6 +503,8 @@ export default function RouteMap({ result, activeLayers, weatherSegments, startH
         for (const el of poiMarkersRef.current) el.style.display = poiVis
         const bailoutVis = initLayers.has('Bailouts') ? 'block' : 'none'
         for (const el of bailoutMarkersRef.current) el.style.display = bailoutVis
+        const imageryVis = initLayers.has('Imagery') ? 'block' : 'none'
+        for (const el of imageryMarkersRef.current) el.style.display = imageryVis
 
         // ── Wind particle canvas ───────────────────────────────────────────
         if (result.wind_field && containerRef.current) {
@@ -560,6 +585,12 @@ export default function RouteMap({ result, activeLayers, weatherSegments, startH
     const bailoutDisplay = activeLayers.has('Bailouts') ? 'block' : 'none'
     for (const el of bailoutMarkersRef.current) {
       el.style.display = bailoutDisplay
+    }
+
+    // Imagery pins — same pattern
+    const imageryDisplay = activeLayers.has('Imagery') ? 'block' : 'none'
+    for (const el of imageryMarkersRef.current) {
+      el.style.display = imageryDisplay
     }
 
     // Wind particles — start/stop with Weather toggle

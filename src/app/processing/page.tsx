@@ -10,6 +10,7 @@ import type {
   LandCrossing,
   CoverageSegment,
   WindField,
+  RouteImage,
 } from '@/lib/types'
 
 // ─── Mesh gradient (shared with intake) ──────────────────────────────────────
@@ -74,7 +75,7 @@ const ELEV_DATA = (() => {
 
 // ─── Service definitions ──────────────────────────────────────────────────────
 
-type ServiceKey = 'parse' | 'osm' | 'weather' | 'lands' | 'coverage' | 'wind'
+type ServiceKey = 'parse' | 'osm' | 'weather' | 'lands' | 'coverage' | 'wind' | 'imagery'
 type ServiceStatus = 'pending' | 'loading' | 'done' | 'error'
 type NarrativeStatus = 'hidden' | 'pending' | 'loading' | 'done' | 'error'
 
@@ -85,6 +86,7 @@ const SERVICES: { key: ServiceKey; label: string }[] = [
   { key: 'lands',    label: 'Querying land boundaries' },
   { key: 'coverage', label: 'Establishing mobile coverage strength' },
   { key: 'wind',     label: 'Building wind field' },
+  { key: 'imagery',  label: 'Collecting route imagery' },
 ]
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -96,7 +98,7 @@ export default function ProcessingPage() {
 
   const [analyzeId, setAnalyzeId]         = useState<string | null>(null)
   const [services, setServices]           = useState<Record<ServiceKey, ServiceStatus>>({
-    parse: 'loading', osm: 'pending', weather: 'pending', lands: 'pending', coverage: 'pending', wind: 'pending',
+    parse: 'loading', osm: 'pending', weather: 'pending', lands: 'pending', coverage: 'pending', wind: 'pending', imagery: 'pending',
   })
   const [narrativeStatus, setNarrativeStatus] = useState<NarrativeStatus>('hidden')
   const [apiError, setApiError]           = useState<string | null>(null)
@@ -107,6 +109,7 @@ export default function ProcessingPage() {
   const landsRef    = useRef<LandCrossing[] | null>(null)
   const coverageRef = useRef<CoverageSegment[] | null>(null)
   const windRef     = useRef<WindField | null>(null)
+  const imageryRef  = useRef<RouteImage[]>([])
   const narrativeRef = useRef<string>('')
   const errorsRef   = useRef<Record<string, string>>({})
 
@@ -171,7 +174,7 @@ export default function ProcessingPage() {
       setServices(s => ({ ...s, [key]: status }))
 
     const run = async () => {
-      setServices(s => ({ ...s, osm: 'loading', weather: 'loading', lands: 'loading', coverage: 'loading', wind: 'loading' }))
+      setServices(s => ({ ...s, osm: 'loading', weather: 'loading', lands: 'loading', coverage: 'loading', wind: 'loading', imagery: 'loading' }))
 
       // Fire OSM, weather, lands, coverage in parallel; track each individually
       const osmP = post('/api/enrich/osm', { id: analyzeId })
@@ -214,6 +217,14 @@ export default function ProcessingPage() {
         })
         .catch(e => { if (!cancelled) { errorsRef.current.wind = e.message; setStatus('wind', 'error') } })
 
+      const imageryP = post('/api/enrich/imagery', { id: analyzeId })
+        .then(data => {
+          if (cancelled) return
+          if (data.error) { errorsRef.current.imagery = data.error; setStatus('imagery', 'error') }
+          else { imageryRef.current = Array.isArray(data) ? data : []; setStatus('imagery', 'done') }
+        })
+        .catch(e => { if (!cancelled) { errorsRef.current.imagery = e.message; setStatus('imagery', 'error') } })
+
       // Narrative waits for OSM + weather + lands
       await Promise.allSettled([osmP, weatherP, landsP])
       if (cancelled) return
@@ -237,8 +248,8 @@ export default function ProcessingPage() {
         })
         .catch(e => { if (!cancelled) { errorsRef.current.narrative = e.message; setNarrativeStatus('error') } })
 
-      // Wait for coverage + wind before finalizing
-      await Promise.allSettled([coverageP, windP])
+      // Wait for coverage, wind, and imagery before finalizing
+      await Promise.allSettled([coverageP, windP, imageryP])
       if (cancelled) return
 
       // Finalize
@@ -249,7 +260,7 @@ export default function ProcessingPage() {
         weather:   weatherRef.current  ?? defaultWeather,
         lands:     landsRef.current    ?? [],
         coverage:  coverageRef.current ?? [],
-        imagery:    [],
+        imagery:    imageryRef.current,
         narrative:  narrativeRef.current,
         errors:     errorsRef.current,
         wind_field: windRef.current ?? undefined,
