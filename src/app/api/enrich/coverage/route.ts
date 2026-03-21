@@ -2,7 +2,7 @@ import { getRoute } from '@/lib/store'
 import { enrichCoverage } from '@/lib/coverage'
 import type { EnrichRequest } from '@/lib/types'
 
-export const maxDuration = 10
+export const maxDuration = 30
 
 export async function POST(req: Request) {
   try {

@@ -63,11 +63,11 @@ function tempToColor(tempC: number): string {
 }
 
 const COVERAGE_COLOR: Record<CoverageConfidence, string> = {
-  good:    '#2d8a4e',
+  good:    '#4caf50',
   fair:    '#fdb618',
   poor:    '#ed1c24',
-  none:    '#555555',
-  unknown: '#444444',
+  none:    '#888888',
+  unknown: 'transparent',
 }
 
 function poiEmoji(poi: { type: string; potable?: boolean; note?: string }): string {
@@ -110,8 +110,12 @@ export default function RouteMap({ result, activeLayers, weatherSegments, startH
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const imageryMarkersRef  = useRef<any[]>([])
   // Ref so the async map load callback can read the current activeLayers
-  const activeLayersRef    = useRef<Set<string>>(activeLayers)
+  const activeLayersRef      = useRef<Set<string>>(activeLayers)
   useEffect(() => { activeLayersRef.current = activeLayers }, [activeLayers])
+
+  // Ref so the async map load callback can read the current weatherSegments
+  const weatherSegmentsRef   = useRef<WeatherSegment[] | undefined>(weatherSegments)
+  useEffect(() => { weatherSegmentsRef.current = weatherSegments }, [weatherSegments])
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const scrubberMarkerRef  = useRef<any>(null)
@@ -123,6 +127,7 @@ export default function RouteMap({ result, activeLayers, weatherSegments, startH
   const windRafRef       = useRef<number>(0)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const windTickRef      = useRef<((...args: any[]) => void) | null>(null)
+
   const startHourRef     = useRef<number>(startHour ?? 9)
   useEffect(() => {
     startHourRef.current = startHour ?? 9
@@ -234,6 +239,9 @@ export default function RouteMap({ result, activeLayers, weatherSegments, startH
             },
           })
 
+          // Use the time-aware segments if available (ref holds current prop value);
+          // fall back to raw NWS segments if the parent hasn't derived them yet.
+          const initWeatherSegs = weatherSegmentsRef.current?.length ? weatherSegmentsRef.current : weatherSegs
           map.addLayer({
             id:     'weather-line',
             type:   'line',
@@ -244,7 +252,7 @@ export default function RouteMap({ result, activeLayers, weatherSegments, startH
               'line-width':    6,
               'line-opacity':  0.6,
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              'line-gradient': buildWeatherGradientExpr(weatherSegs, totalKm) as any,
+              'line-gradient': buildWeatherGradientExpr(initWeatherSegs, totalKm) as any,
             },
           })
         }
@@ -367,20 +375,23 @@ export default function RouteMap({ result, activeLayers, weatherSegments, startH
           bailoutMarkersRef.current = bailoutEls
         }
 
-        // ── Mobile coverage glow ───────────────────────────────────────────
-        // Rendered as two blurred layers *below* the route line so the glow
-        // halos out from behind it without obscuring the route itself.
+        // ── Mobile coverage halo ───────────────────────────────────────────
+        // Wide, blurred line under the route showing coverage quality per segment.
         const coverageSegs = result.coverage ?? []
-        if (coverageSegs.length > 0) {
-          const coverageFeatures = coverageSegs.map((seg, i, arr) => {
-            const fromKm  = i === 0 ? 0 : arr[i - 1].distance_km
-            const toKm    = seg.distance_km
-            const fromIdx = Math.floor(Math.min(fromKm / totalKm, 1) * (coords2d.length - 1))
-            const toIdx   = Math.min(Math.ceil(Math.min(toKm / totalKm, 1) * (coords2d.length - 1)), coords2d.length - 1)
+        const visibleCovSegs = coverageSegs.filter(s => s.confidence !== 'unknown')
+        if (visibleCovSegs.length > 0) {
+          const coverageFeatures = visibleCovSegs.map((seg, i) => {
+            const fromFrac = seg.distance_km / totalKm
+            const toFrac   = i < visibleCovSegs.length - 1
+              ? visibleCovSegs[i + 1].distance_km / totalKm
+              : 1
+            const fromIdx  = Math.round(Math.min(fromFrac, 1) * (coords2d.length - 1))
+            const toIdx    = Math.min(Math.round(Math.min(toFrac, 1) * (coords2d.length - 1)), coords2d.length - 1)
+            const segCoords = coords2d.slice(fromIdx, Math.max(toIdx + 1, fromIdx + 2))
             return {
               type: 'Feature' as const,
-              geometry: { type: 'LineString' as const, coordinates: coords2d.slice(fromIdx, toIdx + 1) },
-              properties: { color: COVERAGE_COLOR[seg.confidence] ?? '#444' },
+              geometry: { type: 'LineString' as const, coordinates: segCoords },
+              properties: { color: COVERAGE_COLOR[seg.confidence] },
             }
           })
 
@@ -389,33 +400,18 @@ export default function RouteMap({ result, activeLayers, weatherSegments, startH
             data: { type: 'FeatureCollection', features: coverageFeatures },
           })
 
-          // Outer glow — wide, very soft
           map.addLayer({
-            id:     'coverage-glow-outer',
+            id:     'coverage-halo',
             type:   'line',
             source: 'coverage',
             layout: { 'line-join': 'round', 'line-cap': 'round' },
             paint: {
               'line-color':   ['get', 'color'],
-              'line-width':   22,
-              'line-opacity': 0.12,
-              'line-blur':    10,
+              'line-width':   18,
+              'line-opacity': 0.75,
+              'line-blur':    3,
             },
-          }, 'route-line') // insert below route line
-
-          // Inner glow — tighter, slightly brighter
-          map.addLayer({
-            id:     'coverage-glow-inner',
-            type:   'line',
-            source: 'coverage',
-            layout: { 'line-join': 'round', 'line-cap': 'round' },
-            paint: {
-              'line-color':   ['get', 'color'],
-              'line-width':   12,
-              'line-opacity': 0.22,
-              'line-blur':    5,
-            },
-          }, 'route-line') // insert below route line
+          }, 'route-line')
         }
 
         // ── Start / End markers ────────────────────────────────────────────
@@ -486,11 +482,11 @@ export default function RouteMap({ result, activeLayers, weatherSegments, startH
         // state so the map matches the UI buttons on first load.
         const initLayers = activeLayersRef.current
         const initLayerMap: Record<string, string[]> = {
-          'Route':        ['route-line'],
-          'Surface':      ['surface-line'],
-          'Weather':      ['weather-line'],
-          'Public Lands': ['lands-line'],
-          'Mobile Coverage': ['coverage-glow-outer', 'coverage-glow-inner'],
+          'Route':           ['route-line'],
+          'Surface':         ['surface-line'],
+          'Weather':         ['weather-line'],
+          'Public Lands':    ['lands-line'],
+          'Mobile Coverage': ['coverage-halo'],
           'Bailouts':        ['bailout-line'],
         }
         for (const [layer, ids] of Object.entries(initLayerMap)) {
@@ -558,11 +554,11 @@ export default function RouteMap({ result, activeLayers, weatherSegments, startH
     if (!map || !map.isStyleLoaded?.()) return
 
     const layerMap: Record<string, string[]> = {
-      'Route':        ['route-line'],
-      'Surface':      ['surface-line'],
-      'Weather':      ['weather-line'],
-      'Public Lands': ['lands-line'],
-      'Mobile Coverage': ['coverage-glow-outer', 'coverage-glow-inner'],
+      'Route':           ['route-line'],
+      'Surface':         ['surface-line'],
+      'Weather':         ['weather-line'],
+      'Public Lands':    ['lands-line'],
+      'Mobile Coverage': ['coverage-halo'],
       'Bailouts':        ['bailout-line'],
     }
 
@@ -595,11 +591,11 @@ export default function RouteMap({ result, activeLayers, weatherSegments, startH
 
     // Wind particles — start/stop with Weather toggle
     cancelAnimationFrame(windRafRef.current)
-    const canvas = windCanvasRef.current
+    const windCanvas = windCanvasRef.current
     if (activeLayers.has('Weather') && windTickRef.current) {
       windRafRef.current = requestAnimationFrame(windTickRef.current)
-    } else if (canvas) {
-      canvas.getContext('2d')?.clearRect(0, 0, canvas.width, canvas.height)
+    } else if (windCanvas) {
+      windCanvas.getContext('2d')?.clearRect(0, 0, windCanvas.width, windCanvas.height)
     }
   }, [activeLayers])
 
