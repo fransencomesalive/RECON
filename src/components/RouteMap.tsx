@@ -187,16 +187,16 @@ export default function RouteMap({ result, activeLayers, weatherSegments, startH
         })
 
         // ── Surface segments ───────────────────────────────────────────────
-        // Build per-segment GeoJSON from surface stats + route coordinates
-        const surfaces = result.surfaces
-        const totalKm  = result.route.distance_km
+        // Use ordered surface_segments (from_km/to_km) for accurate map positions,
+        // matching the elevation profile. surface_segments is always present for
+        // results analyzed after this fix; old results without it won't show surface.
+        const surfaceSegs = result.surface_segments ?? []
+        const totalKm     = result.route.distance_km
 
-        if (surfaces.length > 0 && coords2d.length > 1) {
-          let cursor = 0
-          const surfaceFeatures = surfaces.map(s => {
-            const fromFrac = cursor / totalKm
-            cursor += s.km
-            const toFrac = Math.min(cursor / totalKm, 1)
+        if (surfaceSegs.length > 0 && coords2d.length > 1) {
+          const surfaceFeatures = surfaceSegs.map(s => {
+            const fromFrac = s.from_km / totalKm
+            const toFrac   = Math.min(s.to_km / totalKm, 1)
 
             const fromIdx = Math.floor(fromFrac * (coords2d.length - 1))
             const toIdx   = Math.min(Math.ceil(toFrac  * (coords2d.length - 1)), coords2d.length - 1)
