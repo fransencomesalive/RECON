@@ -769,6 +769,25 @@ export default function ResultsPage() {
                   ))}
                 </div>
               </div>
+              {activeLayers.has('Public Lands') && result.lands.some(l => l.status && l.status !== 'unknown') && (
+                <div className={styles.legendRow}>
+                  <span className={styles.legendTitle}>Land</span>
+                  <span className={styles.legendItem}>
+                    <svg width="28" height="10" style={{ verticalAlign: 'middle' }}><rect x="0" y="2" width="28" height="6" fill="#14532d" rx="2" /></svg> Federal
+                  </span>
+                  <span className={styles.legendItem}>
+                    <svg width="28" height="10" style={{ verticalAlign: 'middle' }}><rect x="0" y="2" width="28" height="6" fill="#f9a825" rx="2" /></svg> State
+                  </span>
+                  <span className={styles.legendItem}>
+                    <svg width="28" height="10" style={{ verticalAlign: 'middle' }}><rect x="0" y="2" width="28" height="6" fill="#c62828" rx="2" /></svg> Private
+                  </span>
+                  {result.lands.some(l => l.status === 'tribal') && (
+                    <span className={styles.legendItem}>
+                      <svg width="28" height="10" style={{ verticalAlign: 'middle' }}><rect x="0" y="2" width="28" height="6" fill="#7b5ea7" rx="2" /></svg> Tribal
+                    </span>
+                  )}
+                </div>
+              )}
               {activeLayers.has('Weather') && displayWeather.length > 0 && (
                 <div className={styles.legendRow}>
                   <span className={styles.legendTitle}>Weather</span>
@@ -908,7 +927,7 @@ export default function ResultsPage() {
                     <span className={styles.landMeta}>
                       {bailoutDist(b, unit)} to safety
                       {' · '}
-                      <strong style={{ color: '#2d8a4e' }}>saves {bailoutSaves(b, unit)}</strong>
+                      <strong style={{ color: '#14532d' }}>saves {bailoutSaves(b, unit)}</strong>
                       {b.next_safe_name ? ` vs. continuing to ${b.next_safe_name}` : ' vs. continuing on route'}
                     </span>
                   </div>
@@ -1013,17 +1032,27 @@ export default function ResultsPage() {
             {result.lands.length > 0 && (
               <div className={styles.card}>
                 <span className={styles.sectionTitle}>Land Management</span>
-                {result.lands.map((land, i) => (
-                  <div key={i} className={styles.landRow}>
-                    <span className={styles.landName}>{land.name}</span>
-                    <span className={styles.landMeta}>
-                      {unit === 'imperial'
-                        ? `${(land.entry_km * 0.621371).toFixed(1)}–${(land.exit_km * 0.621371).toFixed(1)} mi`
-                        : `${land.entry_km.toFixed(1)}–${land.exit_km.toFixed(1)} km`}
-                      {' · '}{land.agency}
-                    </span>
-                  </div>
-                ))}
+                {result.lands.map((land, i) => {
+                  const dotColor = land.status === 'public' ? '#14532d'
+                    : land.status === 'state'   ? '#f9a825'
+                    : land.status === 'private' ? '#c62828'
+                    : land.status === 'tribal'  ? '#7b5ea7'
+                    : '#888'
+                  return (
+                    <div key={i} className={styles.landRow}>
+                      <span className={styles.landName} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: dotColor, flexShrink: 0 }} />
+                        {land.name}
+                      </span>
+                      <span className={styles.landMeta}>
+                        {unit === 'imperial'
+                          ? `${(land.entry_km * 0.621371).toFixed(1)}–${(land.exit_km * 0.621371).toFixed(1)} mi`
+                          : `${land.entry_km.toFixed(1)}–${land.exit_km.toFixed(1)} km`}
+                        {' · '}{land.agency}
+                      </span>
+                    </div>
+                  )
+                })}
               </div>
             )}
 

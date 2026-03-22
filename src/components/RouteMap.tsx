@@ -281,9 +281,16 @@ export default function RouteMap({ result, activeLayers, weatherSegments, startH
         }
         poiMarkersRef.current = poiMarkers
 
-        // ── Land crossings (boundary lines) ───────────────────────────────
-        if (result.lands.length > 0) {
-          const landFeatures = result.lands.map(land => {
+        // ── Land status band ───────────────────────────────────────────────
+        const LAND_COLORS: Record<string, string> = {
+          public:  '#14532d',
+          state:   '#f9a825',
+          private: '#c62828',
+          tribal:  '#7b5ea7',
+        }
+        const visibleLands = result.lands.filter(l => l.status && l.status in LAND_COLORS)
+        if (visibleLands.length > 0) {
+          const landFeatures = visibleLands.map(land => {
             const fromFrac = Math.min(land.entry_km / totalKm, 1)
             const toFrac   = Math.min(land.exit_km  / totalKm, 1)
             const fromIdx  = Math.floor(fromFrac * (coords2d.length - 1))
@@ -291,7 +298,7 @@ export default function RouteMap({ result, activeLayers, weatherSegments, startH
             return {
               type: 'Feature' as const,
               geometry: { type: 'LineString' as const, coordinates: coords2d.slice(fromIdx, toIdx + 1) },
-              properties: { name: land.name, agency: land.agency },
+              properties: { color: LAND_COLORS[land.status] ?? '#888' },
             }
           })
 
@@ -300,18 +307,18 @@ export default function RouteMap({ result, activeLayers, weatherSegments, startH
             data: { type: 'FeatureCollection', features: landFeatures },
           })
 
+          // Insert below route-line so the route stays visible on top
           map.addLayer({
             id:     'lands-line',
             type:   'line',
             source: 'lands',
             layout: { 'line-join': 'round', 'line-cap': 'round' },
             paint: {
-              'line-color':     '#2d8a4e',
-              'line-width':     4,
-              'line-opacity':   0.65,
-              'line-dasharray': [4, 3],
+              'line-color':   ['get', 'color'],
+              'line-width':   8,
+              'line-opacity': 0.45,
             },
-          })
+          }, 'route-line')
         }
 
         // ── Bailout routes ─────────────────────────────────────────────────

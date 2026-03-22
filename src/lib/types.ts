@@ -132,10 +132,13 @@ export interface WeatherResult {
 
 // ─── Public Lands ─────────────────────────────────────────────────────────────
 
+export type LandStatus = 'public' | 'state' | 'private' | 'tribal' | 'unknown'
+
 export interface LandCrossing {
   name: string
   agency: string
   type: string
+  status: LandStatus
   entry_km: number
   exit_km: number
 }
