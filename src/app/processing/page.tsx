@@ -163,8 +163,31 @@ export default function ProcessingPage() {
 
     let cancelled = false
 
+    // Client-side timeouts slightly exceed each endpoint's maxDuration so we
+    // surface a clean error instead of hanging indefinitely if the server stalls.
+    const TIMEOUTS: Record<string, number> = {
+      '/api/enrich/osm':       65_000,
+      '/api/enrich/weather':   25_000,
+      '/api/enrich/lands':     20_000,
+      '/api/enrich/coverage':  35_000,
+      '/api/enrich/wind':      20_000,
+      '/api/enrich/imagery':   35_000,
+      '/api/enrich/narrative': 35_000,
+      '/api/results/finalize': 20_000,
+    }
+
     const post = async (path: string, body: object) => {
-      const r = await fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+      const controller = new AbortController()
+      const timer = setTimeout(() => controller.abort(), TIMEOUTS[path] ?? 60_000)
+      let r: Response
+      try {
+        r = await fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal: controller.signal })
+      } catch (e) {
+        if ((e as Error).name === 'AbortError') throw new Error('Request timed out')
+        throw e
+      } finally {
+        clearTimeout(timer)
+      }
       const text = await r.text()
       try { return JSON.parse(text) }
       catch { throw new Error(r.status === 504 || r.status === 502 ? 'Request timed out' : `Server error (${r.status})`) }

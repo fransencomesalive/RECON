@@ -1,9 +1,17 @@
 import { v4 as uuidv4 } from 'uuid'
+import { Ratelimit } from '@upstash/ratelimit'
+import { Redis } from '@upstash/redis'
 import { parseRouteFile } from '@/lib/parse-route'
 import { storeRoute } from '@/lib/store'
 import type { AnalyzeRequest } from '@/lib/types'
 
 export const maxDuration = 30
+
+// 10 route analyses per IP per day. Only active when Upstash is configured
+// (i.e. in production). Dev mode skips rate limiting.
+const ratelimit = process.env.KV_REST_API_URL
+  ? new Ratelimit({ redis: Redis.fromEnv(), limiter: Ratelimit.slidingWindow(10, '1 d') })
+  : null
 
 // ─── POST /api/analyze ────────────────────────────────────────────────────────
 // Parses the route file/URL → CanonicalRoute, stores it, returns { id }.
@@ -11,6 +19,17 @@ export const maxDuration = 30
 
 export async function POST(req: Request) {
   try {
+    if (ratelimit) {
+      const ip = req.headers.get('x-forwarded-for')?.split(',')[0].trim() ?? '127.0.0.1'
+      const { success } = await ratelimit.limit(ip)
+      if (!success) {
+        return Response.json(
+          { error: 'Daily limit reached (10 routes per day). Come back tomorrow.' },
+          { status: 429 },
+        )
+      }
+    }
+
     const body: AnalyzeRequest = await req.json()
     const { file_data, file_name, url, ride_date } = body
 
@@ -44,7 +63,11 @@ export async function POST(req: Request) {
       const pathPart = new URL(url).pathname.split('/').pop() ?? 'route.gpx'
       resolvedFileName = /\.(gpx|tcx)$/i.test(pathPart) ? pathPart : `${pathPart}.gpx`
     } else {
-      fileContent = Buffer.from(file_data!, 'base64').toString('utf-8')
+      const decoded = Buffer.from(file_data!, 'base64')
+      if (decoded.byteLength > 15 * 1024 * 1024) {
+        return Response.json({ error: 'File too large (max 15 MB).' }, { status: 413 })
+      }
+      fileContent = decoded.toString('utf-8')
       resolvedFileName = file_name!
     }
 

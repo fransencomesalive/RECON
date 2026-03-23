@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
 import "mapbox-gl/dist/mapbox-gl.css";
 
@@ -22,12 +23,16 @@ export const metadata: Metadata = {
         : 'http://localhost:3000'
   ),
   title: 'R.E.C.O.N.',
-  description: 'Route Environment & Condition Observation for Navigation',
+  description: 'Route Environment & Condition Observation for Navigation — pre-ride intelligence for cyclists.',
   icons: {
     icon: '/RECON-1x1-favicon.png',
   },
   openGraph: {
-    images: ['/RECON-shareimage-v2.png'],
+    type:      'website',
+    siteName:  'R.E.C.O.N.',
+    title:     'R.E.C.O.N.',
+    description: 'Pre-ride intelligence for cyclists. Upload a GPX or TCX route and get a full dossier: terrain, weather, land, coverage, and more.',
+    images:    ['/RECON-shareimage-v2.png'],
   },
 };
 
@@ -42,6 +47,7 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
         {children}
+        <Analytics />
       </body>
     </html>
   );

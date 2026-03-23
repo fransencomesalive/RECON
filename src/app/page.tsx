@@ -180,10 +180,17 @@ export default function ReconPage() {
 
   // ── File handling ─────────────────────────────────────────────────────────
 
+  const MAX_FILE_BYTES = 15 * 1024 * 1024 // 15 MB — covers high-density 400-mile ultra recordings
+
   const validateFile = (file: File): boolean => {
     const ext = file.name.split('.').pop()?.toLowerCase()
     if (!['gpx', 'tcx'].includes(ext ?? '')) {
       setFileError('Unsupported file type. Use GPX or TCX.')
+      setSelectedFile(null)
+      return false
+    }
+    if (file.size > MAX_FILE_BYTES) {
+      setFileError('File too large (max 15 MB). Try exporting a simplified or trimmed version.')
       setSelectedFile(null)
       return false
     }
