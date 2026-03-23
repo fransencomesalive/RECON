@@ -1081,8 +1081,22 @@ export default function ResultsPage() {
         {/* ── Footer ── */}
         <footer className={styles.footer}>
           <div className={styles.footerTop}>
-            <span className={styles.version}>v1.000</span>
+            <span className={styles.version}>v1.1</span>
             <span className={styles.disclaimer}>Beta product — results may be inaccurate. Do not rely solely on this data to plan your route.</span>
+          </div>
+          <div className={styles.footerSources}>
+            <span className={styles.footerSourcesLabel}>Data sources:</span>
+            {[
+              { label: 'OpenStreetMap',     url: 'https://wiki.openstreetmap.org/wiki/Overpass_API' },
+              { label: 'NWS Weather',       url: 'https://www.weather.gov/documentation/services-web-api' },
+              { label: 'PAD-US Public Lands', url: 'https://data.usgs.gov/datacatalog/data/USGS:652ef930d34edd15305a9b03' },
+              { label: 'FCC Coverage',      url: 'https://broadbandmap.fcc.gov/' },
+              { label: 'Mapillary',         url: 'https://www.mapillary.com/developer/api-documentation' },
+            ].map(s => (
+              <a key={s.label} href={s.url} target="_blank" rel="noopener noreferrer" className={styles.footerSourceLink}>
+                {s.label}
+              </a>
+            ))}
           </div>
         </footer>
 

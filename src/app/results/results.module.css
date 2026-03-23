@@ -1096,22 +1096,49 @@
 
 /* ─── Footer ──────────────────────────────────────────────────────────────── */
 .footer {
+  width: 100%;
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: center;
-  gap: 0.5rem 1.25rem;
-  padding-top: 0.5rem;
+  flex-direction: column;
+  gap: 0.5rem;
+  text-align: center;
+  padding: 1.5rem 1.5rem 2rem;
+  border-top: 1px solid rgba(255,255,255,0.07);
+  margin-top: 2rem;
 }
 
 .footerTop {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
+  align-items: baseline;
   justify-content: center;
-  gap: 0.5rem 1.25rem;
-  width: 100%;
+  gap: 1rem;
+  flex-wrap: wrap;
 }
 
-.version    { font-family: var(--font-geist-mono, monospace); font-size: 1.3rem; color: rgba(1, 106, 125, 0.6); letter-spacing: 0.1em; }
-.disclaimer { font-family: var(--font-geist-sans, sans-serif); font-size: 1.3rem; color: rgba(1, 106, 125, 0.8); text-align: center; }
+.version    { font-family: var(--font-geist-mono, monospace); font-size: 0.7rem; color: rgba(255,255,255,0.4); letter-spacing: 0.1em; white-space: nowrap; }
+.disclaimer { font-family: var(--font-geist-sans, sans-serif); font-size: 0.7rem; color: rgba(255,255,255,0.45); line-height: 1.5; }
+
+.footerSources {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 0.25rem 0.75rem;
+}
+
+.footerSourcesLabel {
+  font-family: var(--font-geist-mono, monospace);
+  font-size: 0.65rem;
+  color: rgba(255,255,255,0.35);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.footerSourceLink {
+  font-family: var(--font-geist-sans, sans-serif);
+  font-size: 0.65rem;
+  color: rgba(255,255,255,0.4);
+  text-decoration: none;
+  transition: color 0.15s;
+}
+
+.footerSourceLink:hover { color: #fdb618; }

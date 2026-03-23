@@ -380,7 +380,7 @@ export default function ReconPage() {
         {/* Footer */}
         <footer className={styles.footer}>
           <div className={styles.footerTop}>
-            <span className={styles.version}>v1.000</span>
+            <span className={styles.version}>v1.1</span>
             <span className={styles.disclaimer}>
               Beta product — results may be inaccurate. Do not rely solely on this data to plan your route.
             </span>
