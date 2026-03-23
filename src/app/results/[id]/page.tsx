@@ -324,6 +324,32 @@ export default function ResultsPage() {
     setTimeout(() => setCopied(false), 2000)
   }, [])
 
+  const handleExport = useCallback(() => {
+    if (!result) return
+    const coords = result.route.geometry.coordinates
+    const trkpts = coords.map(([lng, lat, ele]) =>
+      ele != null
+        ? `      <trkpt lat="${lat}" lon="${lng}"><ele>${ele}</ele></trkpt>`
+        : `      <trkpt lat="${lat}" lon="${lng}"></trkpt>`
+    ).join('\n')
+    const gpx = `<?xml version="1.0" encoding="UTF-8"?>
+<gpx version="1.1" creator="RECON by Mettle Cycling" xmlns="http://www.topografix.com/GPX/1/1">
+  <trk>
+    <name>${result.route.name}</name>
+    <trkseg>
+${trkpts}
+    </trkseg>
+  </trk>
+</gpx>`
+    const blob = new Blob([gpx], { type: 'application/gpx+xml' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${result.route.name.replace(/[^a-z0-9]/gi, '_')}.gpx`
+    a.click()
+    URL.revokeObjectURL(url)
+  }, [result])
+
   const handleElevMouseMove = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
     const rect = e.currentTarget.getBoundingClientRect()
     const svgX = ((e.clientX - rect.left) / rect.width) * SVG_W
@@ -512,7 +538,7 @@ export default function ResultsPage() {
               {unit === 'imperial' ? 'Miles / Feet' : 'Kilometers / Meters'}
             </button>
             <button className={styles.pill} onClick={handleCopy}>{copied ? 'Copied!' : 'Share'}</button>
-            <button className={styles.pill}>Export</button>
+            <button className={styles.pill} onClick={handleExport}>Export</button>
           </div>
         </header>
 
