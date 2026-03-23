@@ -436,6 +436,20 @@ ${trkpts}
   const route     = result.route
   const totalMi   = Math.round(route.distance_km * 0.621371 * 10) / 10
   const gainFt    = Math.round(route.elevation_gain_m * 3.28084)
+
+  // Convert metric values in narrative text to imperial when unit toggle changes.
+  // Narrative is generated with metric values (km / m) — regex-swap on display.
+  function narrativeForUnit(text: string) {
+    if (unit === 'metric') return text
+    return text
+      // NUMBER km → NUMBER mi  (e.g. "130.5 km" → "81.1 mi")
+      .replace(/(\d+(?:\.\d+)?)\s*km\b/g, (_, n) =>
+        `${(parseFloat(n) * 0.621371).toFixed(1)} mi`)
+      // NUMBER,NUMBER m  or  NUMBER m  followed by word boundary → ft
+      // Avoids matching "mph", "min", etc.
+      .replace(/(\d[\d,]*(?:\.\d+)?)\s*m\b(?!i|ph|in)/g, (_, n) =>
+        `${Math.round(parseFloat(n.replace(/,/g, '')) * 3.28084).toLocaleString()} ft`)
+  }
   const elevData  = buildElevData(result)
   const minElev   = elevData.length ? Math.min(...elevData.map(p => p.elev)) : 0
   const maxElev   = elevData.length ? Math.max(...elevData.map(p => p.elev)) : 1000
@@ -1054,7 +1068,7 @@ ${trkpts}
               <span className={styles.sectionTitle}>Planning Summary</span>
               {result.narrative ? (
                 <div className={styles.narrative}>
-                  {result.narrative.split('\n\n').map((para, i) => (
+                  {narrativeForUnit(result.narrative).split('\n\n').map((para, i) => (
                     <p key={i}>{para}</p>
                   ))}
                 </div>

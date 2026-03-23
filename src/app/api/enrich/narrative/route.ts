@@ -71,8 +71,8 @@ async function generateNarrative(data: {
   const prompt = `You are a cycling route analyst. Write a concise 3–4 paragraph plain-language planning summary for a cyclist preparing for this route.
 
 Route: "${data.route.name}"
-Distance: ${data.route.distance_km} km (${(data.route.distance_km * 0.621371).toFixed(1)} mi)
-Elevation gain: ${data.route.elevation_gain_m} m (${(data.route.elevation_gain_m * 3.28084).toFixed(0)} ft)
+Distance: ${data.route.distance_km} km
+Elevation gain: ${data.route.elevation_gain_m} m
 Ride date: ${data.route.ride_date}
 
 Surface breakdown: ${surfaceSummary || 'unknown'}
