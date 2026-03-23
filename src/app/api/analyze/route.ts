@@ -26,7 +26,7 @@ export async function POST(req: Request) {
         const { success } = await ratelimit.limit(ip)
         if (!success) {
           return Response.json(
-            { error: "To keep it free, we're limiting users to 10 routes per day." },
+            { error: "To keep it free, we're limiting users to 10 routes per day.", _ip: ip },
             { status: 429 },
           )
         }
