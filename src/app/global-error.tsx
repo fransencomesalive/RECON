@@ -23,10 +23,10 @@ export default function GlobalError({ error, reset }: { error: Error & { digest?
             width: '100%', textAlign: 'center',
           }}>
             <p style={{ color: '#fdb618', fontWeight: 700, fontSize: '1.1rem', margin: '0 0 1rem' }}>
-              R.E.C.O.N. is temporarily offline.
+              R.E.C.O.N. seems to be on an unannounced vacation.
             </p>
             <p style={{ color: 'rgba(255,255,255,0.75)', fontSize: '0.9rem', lineHeight: 1.65, margin: '0 0 1.5rem' }}>
-              A critical error occurred. Try reloading — if it persists, start over with a new route.
+              Try again. Hopefully R.E.C.O.N. calls us from the field to let us know.
             </p>
             <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'center' }}>
               <button

@@ -185,12 +185,12 @@ export default function ReconPage() {
   const validateFile = (file: File): boolean => {
     const ext = file.name.split('.').pop()?.toLowerCase()
     if (!['gpx', 'tcx'].includes(ext ?? '')) {
-      setFileError('Unsupported file type. Use GPX or TCX.')
+      setFileError("We're only taking .gpx or .tcx files at the moment. What you uploaded is not one of those (or corrupted).")
       setSelectedFile(null)
       return false
     }
     if (file.size > MAX_FILE_BYTES) {
-      setFileError('File too large (max 15 MB). Try exporting a simplified or trimmed version.')
+      setFileError('What are you doing, riding 1000 miles?! File sizes are limited to 15MB.')
       setSelectedFile(null)
       return false
     }
@@ -342,7 +342,7 @@ export default function ReconPage() {
               onClick={(e) => e.stopPropagation()}
             />
             {url && !isValidUrl(url) && (
-              <span className={styles.errorMsg}>Enter a valid http/https URL</span>
+              <span className={styles.errorMsg}>{"Something's up with your URL. Double check it."}</span>
             )}
             <span className={styles.comingSoon}>Strava · MapMyRide import coming in V2</span>
           </div>
@@ -362,7 +362,7 @@ export default function ReconPage() {
             />
             {dateWarning && (
               <span className={styles.dateWarning}>
-                Forecasts beyond 10 days are unavailable. RECON will use historical patterns and typical conditions for this date and region.
+                {"We're forecasting, not predicting far into the future. 10 days from now is as far as we can check for ya."}
               </span>
             )}
           </div>

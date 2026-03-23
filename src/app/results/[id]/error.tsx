@@ -21,8 +21,8 @@ export default function ResultsError({ error, reset }: { error: Error & { digest
   return (
     <ErrorCard
       service={service}
-      headline="Failed to load dossier."
-      body="This result couldn't be retrieved. The analysis may have expired or a service failed mid-run. Start a new analysis to try again."
+      headline="Your dossier failed to load."
+      body="The analysis expired or a service failed mid-run. Try analyzing again from the start."
       reset={reset}
     />
   )

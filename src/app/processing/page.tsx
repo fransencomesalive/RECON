@@ -123,7 +123,7 @@ export default function ProcessingPage() {
     const routeUrl = sessionStorage.getItem('recon_route_url')
 
     if (!fileData && !routeUrl) {
-      setApiError('No route data found. Please go back and upload a file.')
+      setApiError('No route data was provided. Try uploading a file.')
       return
     }
 
@@ -143,7 +143,7 @@ export default function ProcessingPage() {
         try { data = JSON.parse(text) }
         catch {
           throw new Error(r.status === 504 || r.status === 502
-            ? 'Analysis timed out. Try a shorter route or try again.'
+            ? 'Lots of stuff to analyze, sorry it timed out. Try a shorter route or give it another go.'
             : `Server error (${r.status}). Please try again.`)
         }
         if (data.error) { setApiError(data.error); return }
@@ -153,7 +153,7 @@ export default function ProcessingPage() {
         setServices(s => ({ ...s, parse: 'done' }))
         setAnalyzeId(data.id!)
       })
-      .catch(err => setApiError(err.message ?? 'Analysis failed.'))
+      .catch(err => setApiError(err.message ?? 'Something broke, please try again.'))
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -293,7 +293,7 @@ export default function ProcessingPage() {
           if (data.error) { setApiError(data.error); return }
           router.push(`/results/${data.id}`)
         })
-        .catch(e => { if (!cancelled) setApiError(e.message ?? 'Failed to save result.') })
+        .catch(e => { if (!cancelled) setApiError(e.message ?? 'Something broke, please try again.') })
     }
 
     run().catch(e => { if (!cancelled) setApiError((e as Error).message) })
@@ -450,7 +450,7 @@ export default function ProcessingPage() {
             {isStravaError ? (
               <>
                 <p style={{ color: '#ed1c24', fontFamily: 'monospace', textAlign: 'center', padding: '1rem 1rem 0' }}>
-                  Strava requires login to access this route.
+                  {"You'll have to login to Strava first, sorry. It's them, not us."}
                 </p>
                 <p style={{ color: 'rgba(255,255,255,0.75)', fontFamily: 'monospace', fontSize: '0.85rem', textAlign: 'center', padding: '0.5rem 1rem 1rem', lineHeight: 1.6 }}>
                   Export a <strong>.gpx</strong> file from Strava and upload it directly:<br />

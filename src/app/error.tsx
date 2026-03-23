@@ -8,8 +8,8 @@ export default function AppError({ error, reset }: { error: Error & { digest?: s
 
   return (
     <ErrorCard
-      headline="Something went wrong."
-      body="An unexpected error occurred. You can try again or start over with a new route."
+      headline="Something broke and we're not sure what."
+      body="Give it another try."
       reset={reset}
     />
   )
