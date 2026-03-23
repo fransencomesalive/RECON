@@ -384,6 +384,7 @@ export default function ReconPage() {
             <span className={styles.disclaimer}>
               Beta product — results may be inaccurate. Do not rely solely on this data to plan your route.
             </span>
+            <span className={styles.version}>© Mettle Cycling 2026</span>
           </div>
           <div className={styles.sources}>
             <span className={styles.sourcesLabel}>Data sources:</span>

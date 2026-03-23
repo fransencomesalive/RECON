@@ -1,5 +1,7 @@
 'use client'
 
+export const dynamic = 'force-dynamic'
+
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
@@ -564,6 +566,7 @@ export default function ProcessingPage() {
         </div>
 
       </div>
+      <footer className={styles.copyright}>© Mettle Cycling 2026</footer>
     </main>
   )
 }

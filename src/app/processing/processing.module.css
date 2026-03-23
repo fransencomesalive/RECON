@@ -254,3 +254,12 @@
   background: #fdb618;
   margin-left: 13px;
 }
+
+.copyright {
+  font-family: var(--font-geist-mono, monospace);
+  font-size: 0.7rem;
+  color: rgba(255, 255, 255, 0.4);
+  letter-spacing: 0.1em;
+  text-align: center;
+  padding: 1.5rem;
+}

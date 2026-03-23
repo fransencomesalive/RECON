@@ -1083,6 +1083,7 @@ export default function ResultsPage() {
           <div className={styles.footerTop}>
             <span className={styles.version}>v1.1</span>
             <span className={styles.disclaimer}>Beta product — results may be inaccurate. Do not rely solely on this data to plan your route.</span>
+            <span className={styles.version}>© Mettle Cycling 2026</span>
           </div>
           <div className={styles.footerSources}>
             <span className={styles.footerSourcesLabel}>Data sources:</span>
