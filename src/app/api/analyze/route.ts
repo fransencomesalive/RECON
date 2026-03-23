@@ -21,12 +21,15 @@ export async function POST(req: Request) {
   try {
     if (ratelimit) {
       const ip = req.headers.get('x-forwarded-for')?.split(',')[0].trim() ?? '127.0.0.1'
-      const { success } = await ratelimit.limit(ip)
-      if (!success) {
-        return Response.json(
-          { error: "To keep it free, we're limiting users to 10 routes per day." },
-          { status: 429 },
-        )
+      const whitelist = ['2601:280:4a85:7630:5d59:c3ca:9e3e:5398']
+      if (!whitelist.includes(ip)) {
+        const { success } = await ratelimit.limit(ip)
+        if (!success) {
+          return Response.json(
+            { error: "To keep it free, we're limiting users to 10 routes per day." },
+            { status: 429 },
+          )
+        }
       }
     }
 
