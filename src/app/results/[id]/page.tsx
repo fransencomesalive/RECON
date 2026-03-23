@@ -253,8 +253,11 @@ export default function ResultsPage() {
   const [unit,         setUnit]         = useState<'imperial' | 'metric'>('imperial')
   const [activeLayers, setActiveLayers] = useState<Set<string>>(new Set(['Route', 'POIs', 'Bailouts']))
   const [copied,       setCopied]       = useState(false)
-  const [editingDate,  setEditingDate]  = useState(false)
-  const [rideDate,     setRideDate]     = useState('')
+  const [editingDate,    setEditingDate]    = useState(false)
+  const [rideDate,       setRideDate]       = useState('')
+  const [weatherLoading, setWeatherLoading] = useState(false)
+  const [weatherSegs,    setWeatherSegs]    = useState<WeatherSegment[] | null>(null)
+  const initialDateRef = useRef<string>('')
   const [speedKph,     setSpeedKph]     = useState(16 / 0.621371)  // 16 mph default
   const [startHour,    setStartHour]    = useState(9)
   const [hoverFrac,    setHoverFrac]    = useState<number | null>(null)
@@ -267,11 +270,30 @@ export default function ResultsPage() {
       .then(data => {
         if (data.error) { setFetchError(data.error); return }
         setResult(data as ReconResult)
-        setRideDate(data.route.ride_date ?? '')
+        const date = data.route.ride_date ?? ''
+        setRideDate(date)
+        initialDateRef.current = date
       })
       .catch(e => setFetchError(e.message))
       .finally(() => setLoading(false))
   }, [id])
+
+  // ── Re-fetch weather when ride date changes ────────────────────────────────
+  useEffect(() => {
+    if (!rideDate || rideDate === initialDateRef.current) return
+    const diffDays = (new Date(rideDate).getTime() - Date.now()) / 86400000
+    if (diffDays > 7) return  // out of NWS window — don't bother fetching
+    setWeatherLoading(true)
+    fetch('/api/enrich/weather', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, date: rideDate }),
+    })
+      .then(r => r.json())
+      .then(data => { if (!data.error) setWeatherSegs(data.segments) })
+      .catch(() => {/* silently keep existing data */})
+      .finally(() => setWeatherLoading(false))
+  }, [id, rideDate])
 
   // ── Mesh gradient ─────────────────────────────────────────────────────────
   useEffect(() => {
@@ -369,10 +391,14 @@ ${trkpts}
   }, [])
 
   // ── Time-aware weather (must be before early returns — Rules of Hooks) ───
+  const activeWeatherSegs = weatherSegs ?? result?.weather.segments ?? []
   const displayWeather = useMemo<WeatherSegment[]>(
-    () => result ? deriveWeatherSegments(result.weather.segments, speedKph, startHour) : [],
-    [result, speedKph, startHour],
+    () => deriveWeatherSegments(activeWeatherSegs, speedKph, startHour),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [activeWeatherSegs, speedKph, startHour],
   )
+
+  const dateOutOfWindow = !!rideDate && (new Date(rideDate).getTime() - Date.now()) / 86400000 > 7
 
   // ── Loading / error states ────────────────────────────────────────────────
   if (loading) {
@@ -518,6 +544,16 @@ ${trkpts}
             <span className={styles.notchDate} onClick={() => setEditingDate(true)}>
               Proposed Date: {formatRideDate(rideDate)}
               <span className={styles.dateEditIcon}>✎</span>
+            </span>
+          )}
+          {weatherLoading && (
+            <span style={{ fontSize: 10, letterSpacing: '0.08em', color: 'rgba(255,255,255,0.45)', marginLeft: 8 }}>
+              UPDATING WEATHER…
+            </span>
+          )}
+          {!weatherLoading && dateOutOfWindow && (
+            <span style={{ fontSize: 10, letterSpacing: '0.08em', color: '#fcba4b', marginLeft: 8 }}>
+              NWS ONLY CARRIES 7 DAYS OUT — WEATHER DATA MAY NOT REFLECT THIS DATE
             </span>
           )}
         </div>

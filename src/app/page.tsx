@@ -232,7 +232,7 @@ export default function ReconPage() {
     setRideDate(val)
     if (val) {
       const diffDays = (new Date(val).getTime() - Date.now()) / 86400000
-      setDateWarning(diffDays > 10)
+      setDateWarning(diffDays > 7)
     } else {
       setDateWarning(false)
     }
@@ -362,7 +362,7 @@ export default function ReconPage() {
             />
             {dateWarning && (
               <span className={styles.dateWarning}>
-                {"We're forecasting, not predicting far into the future. 10 days from now is as far as we can check for ya."}
+                {"We're forecasting, not predicting far into the future. NWS only carries 7 days out — pick a closer date for real weather data."}
               </span>
             )}
           </div>

@@ -6,14 +6,14 @@ export const maxDuration = 20
 
 export async function POST(req: Request) {
   try {
-    const { id }: EnrichRequest = await req.json()
+    const { id, date }: EnrichRequest & { date?: string } = await req.json()
     if (!id) return Response.json({ error: 'Missing id.' }, { status: 400 })
 
     const route = await getRoute(id)
     if (!route) return Response.json({ error: 'Route not found.' }, { status: 404 })
 
     const result = await Promise.race([
-      enrichWeather(route.sample_points, route.bbox, route.ride_date),
+      enrichWeather(route.sample_points, route.bbox, date ?? route.ride_date),
       new Promise<never>((_, reject) =>
         setTimeout(() => reject(new Error('Weather timeout')), 15_000)),
     ])
