@@ -251,7 +251,7 @@ export default function ResultsPage() {
   const [loading,      setLoading]      = useState(true)
   const [fetchError,   setFetchError]   = useState<string | null>(null)
   const [unit,         setUnit]         = useState<'imperial' | 'metric'>('imperial')
-  const [activeLayers, setActiveLayers] = useState<Set<string>>(new Set(['Route', 'POIs', 'Bailouts']))
+  const [activeLayers, setActiveLayers] = useState<Set<string>>(new Set(['Route', 'POIs']))
   const [copied,       setCopied]       = useState(false)
   const [editingDate,    setEditingDate]    = useState(false)
   const [rideDate,       setRideDate]       = useState('')
