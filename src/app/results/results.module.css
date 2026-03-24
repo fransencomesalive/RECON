@@ -469,9 +469,40 @@
   color: #011c24;
 }
 
+/* ─── Stat top row (Distance · Elev Gain · Surfaces) ─────────────────────── */
+.statTopRow {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
 @media (max-width: 800px) {
   .elevStatsRow {
     grid-template-columns: 1fr;
+  }
+  .statTopRow {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.5rem;
+  }
+  .statTopRow .statCard {
+    padding: 0.6rem 0.5rem;
+  }
+  .statTopRow .statValue {
+    font-size: 0.82rem;
+  }
+  /* Legend: 2-col grid, larger emoji, tighter labels */
+  .legendPointsGrid {
+    grid-template-rows: repeat(5, auto);
+    gap: 0.3rem 1.25rem;
+  }
+  .legendEmoji {
+    font-size: 18px;
+  }
+  .legendItem {
+    font-size: 0.78rem;
+    align-items: center;
+    gap: 0.3rem;
   }
 }
 
@@ -661,6 +692,12 @@
   color: #016a7d;
 }
 
+.legendEmoji {
+  font-size: 14px;
+  flex-shrink: 0;
+  line-height: 1;
+}
+
 .dot {
   width: 9px;
   height: 9px;
@@ -794,7 +831,18 @@
 }
 
 @media (max-width: 800px) {
+  .notch {
+    position: relative;
+    top: auto;
+    left: auto;
+    transform: none;
+    margin: 1rem auto 0;
+  }
+  .layout {
+    padding-top: 1rem;
+  }
   .dossier { grid-template-columns: 1fr; }
+  .dossierRight { order: -1; position: static; }
 }
 
 .dossierLeft {

@@ -840,7 +840,7 @@ ${trkpts}
                     { emoji: '☠️', label: 'Bailout point' },
                   ].map(({ emoji, label }) => (
                     <span key={label} className={styles.legendItem}>
-                      <span style={{ fontSize: '14px' }}>{emoji}</span> {label}
+                      <span className={styles.legendEmoji}>{emoji}</span>{label}
                     </span>
                   ))}
                 </div>
@@ -888,17 +888,23 @@ ${trkpts}
 
           {/* Stats panel — 15% */}
           <div className={styles.statsPanel}>
-            <div className={styles.statCard}>
-              <span className={styles.statLabel}>Distance</span>
-              <span className={styles.statValue}>
-                {unit === 'imperial' ? `${totalMi} mi` : `${route.distance_km} km`}
-              </span>
-            </div>
-            <div className={styles.statCard}>
-              <span className={styles.statLabel}>Elevation Gain</span>
-              <span className={styles.statValue}>
-                {unit === 'imperial' ? `${gainFt.toLocaleString()} ft` : `${route.elevation_gain_m.toLocaleString()} m`}
-              </span>
+            <div className={styles.statTopRow}>
+              <div className={styles.statCard}>
+                <span className={styles.statLabel}>Distance</span>
+                <span className={styles.statValue}>
+                  {unit === 'imperial' ? `${totalMi} mi` : `${route.distance_km} km`}
+                </span>
+              </div>
+              <div className={styles.statCard}>
+                <span className={styles.statLabel}>Elevation Gain</span>
+                <span className={styles.statValue}>
+                  {unit === 'imperial' ? `${gainFt.toLocaleString()} ft` : `${route.elevation_gain_m.toLocaleString()} m`}
+                </span>
+              </div>
+              <div className={styles.statCard}>
+                <span className={styles.statLabel}>Surfaces</span>
+                <span className={styles.statValue}>{pavedPct}% paved</span>
+              </div>
             </div>
             <div className={styles.statCard}>
               <span className={styles.statLabel}>Est. Ride Time</span>
@@ -936,10 +942,6 @@ ${trkpts}
                   />
                 </div>
               </div>
-            </div>
-            <div className={styles.statCard}>
-              <span className={styles.statLabel}>Surfaces</span>
-              <span className={styles.statValue}>{pavedPct}% paved</span>
             </div>
           </div>
 
