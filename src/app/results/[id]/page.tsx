@@ -437,18 +437,24 @@ ${trkpts}
   const totalMi   = Math.round(route.distance_km * 0.621371 * 10) / 10
   const gainFt    = Math.round(route.elevation_gain_m * 3.28084)
 
-  // Convert metric values in narrative text to imperial when unit toggle changes.
-  // Narrative is generated with metric values (km / m) — regex-swap on display.
+  // Convert narrative text to the selected unit system.
+  // Works regardless of what units Claude wrote — converts in both directions.
   function narrativeForUnit(text: string) {
-    if (unit === 'metric') return text
+    if (unit === 'imperial') {
+      return text
+        // NUMBER km → mi
+        .replace(/(\d+(?:\.\d+)?)\s*km\b/g, (_, n) =>
+          `${(parseFloat(n) * 0.621371).toFixed(1)} mi`)
+        // NUMBER m → ft  (skip mph, min, etc.)
+        .replace(/(\d[\d,]*(?:\.\d+)?)\s*m\b(?!i|ph|in)/g, (_, n) =>
+          `${Math.round(parseFloat(n.replace(/,/g, '')) * 3.28084).toLocaleString()} ft`)
+    }
+    // metric: convert any imperial values in the text
     return text
-      // NUMBER km → NUMBER mi  (e.g. "130.5 km" → "81.1 mi")
-      .replace(/(\d+(?:\.\d+)?)\s*km\b/g, (_, n) =>
-        `${(parseFloat(n) * 0.621371).toFixed(1)} mi`)
-      // NUMBER,NUMBER m  or  NUMBER m  followed by word boundary → ft
-      // Avoids matching "mph", "min", etc.
-      .replace(/(\d[\d,]*(?:\.\d+)?)\s*m\b(?!i|ph|in)/g, (_, n) =>
-        `${Math.round(parseFloat(n.replace(/,/g, '')) * 3.28084).toLocaleString()} ft`)
+      .replace(/(\d+(?:\.\d+)?)\s*mi(?:les?)?\b/g, (_, n) =>
+        `${(parseFloat(n) / 0.621371).toFixed(1)} km`)
+      .replace(/(\d[\d,]*(?:\.\d+)?)\s*(?:feet|ft)\b/g, (_, n) =>
+        `${Math.round(parseFloat(n.replace(/,/g, '')) / 3.28084).toLocaleString()} m`)
   }
   const elevData  = buildElevData(result)
   const minElev   = elevData.length ? Math.min(...elevData.map(p => p.elev)) : 0

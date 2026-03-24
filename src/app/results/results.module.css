@@ -491,19 +491,6 @@
   .statTopRow .statValue {
     font-size: 0.82rem;
   }
-  /* Legend: 2-col grid, larger emoji, tighter labels */
-  .legendPointsGrid {
-    grid-template-rows: repeat(5, auto);
-    gap: 0.3rem 1.25rem;
-  }
-  .legendEmoji {
-    font-size: 18px;
-  }
-  .legendItem {
-    font-size: 0.78rem;
-    align-items: center;
-    gap: 0.3rem;
-  }
 }
 
 .pill {
@@ -842,7 +829,20 @@
     padding-top: 1rem;
   }
   .dossier { grid-template-columns: 1fr; }
-  .dossierRight { order: -1; position: static; }
+  .dossierRight { order: -1; }
+  /* Legend: 2-col grid, larger emoji, tighter labels */
+  .legendPointsGrid {
+    grid-template-rows: repeat(5, auto);
+    gap: 0.3rem 1.25rem;
+  }
+  .legendEmoji {
+    font-size: 18px;
+  }
+  .legendItem {
+    font-size: 0.78rem;
+    align-items: center;
+    gap: 0.3rem;
+  }
 }
 
 .dossierLeft {
@@ -857,6 +857,13 @@
   gap: 1.25rem;
   position: sticky;
   top: 5.5rem;
+}
+
+@media (max-width: 800px) {
+  .dossierRight {
+    position: static;
+    top: auto;
+  }
 }
 
 /* ─── Elevation header ────────────────────────────────────────────────────── */
