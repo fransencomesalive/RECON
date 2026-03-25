@@ -121,7 +121,7 @@
   display: block;
   font-family: var(--font-geist-sans, sans-serif);
   font-size: 0.72rem;
-  color: rgba(255, 255, 255, 0.70);
+  color: #555;
   margin-top: 0.25rem;
 }
 
@@ -199,7 +199,7 @@
 }
 
 .urlInput::placeholder {
-  color: #999;
+  color: #777;
 }
 
 .urlBadge {
