@@ -116,8 +116,11 @@ export async function POST(req: Request) {
         }
         if (!res!.ok) {
           const isRwgps = fetchUrl.includes('ridewithgps.com')
-          if ((res!.status === 401 || res!.status === 403) && isRwgps) {
-            throw new Error('Ride with GPS requires you to be logged in to download routes. Please download the GPX from Ride with GPS and upload the file here instead.')
+          if (isRwgps && res!.status === 404) {
+            throw new Error('Route not found on Ride with GPS. If the route is private, use the share link that includes a privacy code.')
+          }
+          if (isRwgps && (res!.status === 401 || res!.status === 403)) {
+            throw new Error('Ride with GPS requires you to be logged in. Please download the GPX from Ride with GPS and upload the file here instead.')
           }
           throw new Error(`Failed to fetch route URL: ${res!.status}`)
         }

@@ -71,7 +71,11 @@ function detectUrlPlatform(url: string): UrlPlatform | null {
     const host = u.hostname.replace(/^www\./, '')
     if (host === 'ridewithgps.com') {
       const m = u.pathname.match(/^\/(routes|trips)\/(\d+)(?:\.gpx)?$/)
-      if (m) return { type: 'rwgps', exportUrl: `https://ridewithgps.com/${m[1]}/${m[2]}.gpx` }
+      if (m) {
+        const privacyCode = u.searchParams.get('privacy_code')
+        const gpxUrl = `https://ridewithgps.com/${m[1]}/${m[2]}.gpx${privacyCode ? `?privacy_code=${encodeURIComponent(privacyCode)}` : ''}`
+        return { type: 'rwgps', exportUrl: gpxUrl }
+      }
     }
     if (host === 'strava.com') {
       const m = u.pathname.match(/\/routes\/(\d+)/)
