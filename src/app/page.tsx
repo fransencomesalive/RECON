@@ -385,7 +385,7 @@ export default function ReconPage() {
             {fileError && <span className={styles.errorMsg}>{fileError}</span>}
           </div>
 
-          <div className={styles.divider}><span>or</span></div>
+          <div className={styles.divider}><span>— OR —</span></div>
 
           {/* URL paste */}
           <div
