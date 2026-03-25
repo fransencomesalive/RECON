@@ -402,7 +402,7 @@ export default function ReconPage() {
                 id="route-url"
                 type="text"
                 className={styles.urlInput}
-                placeholder="ridewithgps.com/routes/... or direct .gpx / .tcx link"
+                placeholder="ridewithgps.com/routes/..."
                 value={url}
                 onChange={handleUrlChange}
                 onClick={(e) => e.stopPropagation()}
@@ -412,7 +412,7 @@ export default function ReconPage() {
               <span className={styles.errorMsg}>{"Something's up with your URL. Double check it."}</span>
             )}
             {!url && (
-              <span className={styles.comingSoon}>Ride with GPS routes · Direct .gpx and .tcx links</span>
+              <span className={styles.comingSoon}>Ride with GPS routes supported</span>
             )}
             {platform?.type === 'rwgps' && (
               <span className={styles.platformInfo}>
