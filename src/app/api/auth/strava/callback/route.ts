@@ -1,4 +1,4 @@
-import { type NextRequest } from 'next/server'
+import { NextResponse, type NextRequest } from 'next/server'
 
 // GET /api/auth/strava/callback
 // Exchanges the Strava auth code for an access token, sets two cookies:
@@ -42,12 +42,11 @@ export async function GET(req: NextRequest) {
     return Response.redirect(`${baseUrl}/?strava_error=token_exchange`)
   }
 
-  const maxAge  = data.expires_in ?? 21600 // Strava tokens live ~6 hours
-  const secure  = !baseUrl.startsWith('http://localhost')
-  const base    = `Path=/; SameSite=Lax; Max-Age=${maxAge}${secure ? '; Secure' : ''}`
+  const maxAge = data.expires_in ?? 21600 // Strava tokens live ~6 hours
+  const secure = !baseUrl.startsWith('http://localhost')
 
-  const res = Response.redirect(`${baseUrl}/?strava=connected`)
-  res.headers.append('Set-Cookie', `strava_token=${data.access_token}; HttpOnly; ${base}`)
-  res.headers.append('Set-Cookie', `strava_connected=1; ${base}`)
+  const res = NextResponse.redirect(`${baseUrl}/?strava=connected`)
+  res.cookies.set('strava_token', data.access_token, { httpOnly: true, path: '/', sameSite: 'lax', maxAge, secure })
+  res.cookies.set('strava_connected', '1', { path: '/', sameSite: 'lax', maxAge, secure })
   return res
 }
