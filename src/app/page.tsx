@@ -392,19 +392,23 @@ export default function ReconPage() {
               url && isValidUrl(url) && !isAuthRequired ? styles.cardFilled : '',
             ].join(' ')}
           >
-            <input
-              type="text"
-              className={styles.urlInput}
-              placeholder="Paste a route URL or direct link to a .gpx / .tcx file"
-              value={url}
-              onChange={handleUrlChange}
-              onClick={(e) => e.stopPropagation()}
-            />
+            <div className={styles.urlField}>
+              <label htmlFor="route-url" className={styles.urlLabel}>Route URL</label>
+              <input
+                id="route-url"
+                type="text"
+                className={styles.urlInput}
+                placeholder="ridewithgps.com/routes/... or direct .gpx / .tcx link"
+                value={url}
+                onChange={handleUrlChange}
+                onClick={(e) => e.stopPropagation()}
+              />
+            </div>
             {url && !isValidUrl(url) && (
               <span className={styles.errorMsg}>{"Something's up with your URL. Double check it."}</span>
             )}
             {!url && (
-              <span className={styles.comingSoon}>Only Ride with GPS links currently supported</span>
+              <span className={styles.comingSoon}>Ride with GPS routes · Direct .gpx and .tcx links</span>
             )}
             {platform?.type === 'rwgps' && (
               <span className={styles.platformInfo}>

@@ -104,11 +104,23 @@ export async function POST(req: Request) {
         const timer = setTimeout(() => controller.abort(), 15_000)
         let res: Response
         try {
-          res = await fetch(fetchUrl, { signal: controller.signal })
+          res = await fetch(fetchUrl, {
+            signal: controller.signal,
+            headers: {
+              'User-Agent': 'Mozilla/5.0 (compatible; RECON/1.0; +https://recon.mettlecycling.com)',
+              'Accept': 'application/gpx+xml, application/xml, text/xml, */*',
+            },
+          })
         } finally {
           clearTimeout(timer)
         }
-        if (!res!.ok) throw new Error(`Failed to fetch route URL: ${res!.status}`)
+        if (!res!.ok) {
+          const isRwgps = fetchUrl.includes('ridewithgps.com')
+          if ((res!.status === 401 || res!.status === 403) && isRwgps) {
+            throw new Error('Ride with GPS requires you to be logged in to download routes. Please download the GPX from Ride with GPS and upload the file here instead.')
+          }
+          throw new Error(`Failed to fetch route URL: ${res!.status}`)
+        }
         fileContent = await res!.text()
         const trimmed = fileContent.trimStart()
         if (trimmed.startsWith('<!') || trimmed.toLowerCase().startsWith('<html')) {

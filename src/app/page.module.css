@@ -4,7 +4,7 @@
   --amber-dark:  #d4960e;
   --error:       #ed1c24;
   --teal-deep:   #011c24;
-  --card-bg:     rgba(255, 255, 255, 0.30);
+  --card-bg:     rgba(255, 255, 255, 0.55);
   --card-border: 3px solid var(--amber);
   --card-radius: 4px;
 }
@@ -114,15 +114,15 @@
 
 .cardUrl {
   cursor: default;
+  align-items: stretch;
 }
 
 .comingSoon {
   display: block;
-  font-family: var(--font-geist-mono, monospace);
-  font-size: 0.7rem;
-  letter-spacing: 0.08em;
-  color: rgba(255, 255, 255, 0.35);
-  margin-top: 0.4rem;
+  font-family: var(--font-geist-sans, sans-serif);
+  font-size: 0.72rem;
+  color: rgba(255, 255, 255, 0.70);
+  margin-top: 0.25rem;
 }
 
 .cardDragging {
@@ -163,19 +163,43 @@
 }
 
 /* ─── URL input ───────────────────────────────────────────────────────────── */
+.urlField {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  width: 100%;
+}
+
+.urlLabel {
+  font-family: var(--font-geist-mono, monospace);
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #444;
+}
+
 .urlInput {
   width: 100%;
-  background: transparent;
-  border: none;
+  background: rgba(255, 255, 255, 0.88);
+  border: 1.5px solid rgba(0, 0, 0, 0.18);
+  border-radius: 3px;
   outline: none;
   font-family: var(--font-geist-sans, sans-serif);
   font-size: 0.9rem;
   color: #111;
-  text-align: center;
+  text-align: left;
+  padding: 0.5rem 0.7rem;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.urlInput:focus {
+  border-color: var(--amber-dark);
+  background: rgba(255, 255, 255, 0.97);
 }
 
 .urlInput::placeholder {
-  color: #333;
+  color: #999;
 }
 
 .urlBadge {
