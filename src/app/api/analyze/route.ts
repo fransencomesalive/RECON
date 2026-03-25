@@ -7,6 +7,21 @@ import type { AnalyzeRequest } from '@/lib/types'
 
 export const maxDuration = 30
 
+// ─── URL helpers ──────────────────────────────────────────────────────────────
+
+function resolveRouteUrl(url: string): string {
+  try {
+    const u = new URL(url)
+    const host = u.hostname.replace(/^www\./, '')
+    if (host === 'ridewithgps.com') {
+      const m = u.pathname.match(/^\/(routes|trips)\/(\d+)$/)
+      if (m) return `https://ridewithgps.com/${m[1]}/${m[2]}.gpx`
+    }
+  } catch { /* ignore */ }
+  return url
+}
+
+
 // 10 route analyses per IP per day. Only active when Upstash is configured
 // (i.e. in production). Dev mode skips rate limiting.
 const ratelimit = process.env.KV_REST_API_URL
@@ -48,23 +63,66 @@ export async function POST(req: Request) {
     let resolvedFileName: string
 
     if (url) {
-      // AbortSignal.timeout is unreliable in Vercel Node.js — use explicit controller
-      const controller = new AbortController()
-      const timer = setTimeout(() => controller.abort(), 15_000)
-      let res: Response
-      try {
-        res = await fetch(url, { signal: controller.signal })
-      } finally {
-        clearTimeout(timer)
+      // ── Strava route — fetch via Strava API using OAuth token from cookie ──
+      const stravaRouteId = (() => {
+        try {
+          const u = new URL(url)
+          if (u.hostname.replace(/^www\./, '') === 'strava.com') {
+            return u.pathname.match(/\/routes\/(\d+)/)?.[1] ?? null
+          }
+        } catch { /* ignore */ }
+        return null
+      })()
+
+      if (stravaRouteId) {
+        const token = req.headers.get('cookie')?.match(/strava_token=([^;]+)/)?.[1]
+        if (!token) {
+          return Response.json({ error: 'STRAVA_NOT_CONNECTED' }, { status: 401 })
+        }
+        const controller = new AbortController()
+        const timer = setTimeout(() => controller.abort(), 15_000)
+        let gpxRes: Response
+        try {
+          gpxRes = await fetch(
+            `https://www.strava.com/api/v3/routes/${stravaRouteId}/export_gpx`,
+            { signal: controller.signal, headers: { Authorization: `Bearer ${token}` } }
+          )
+        } finally {
+          clearTimeout(timer)
+        }
+        if (gpxRes!.status === 401) {
+          return Response.json({ error: 'STRAVA_TOKEN_EXPIRED' }, { status: 401 })
+        }
+        if (!gpxRes!.ok) throw new Error(`Failed to fetch Strava route: ${gpxRes!.status}`)
+        fileContent = await gpxRes!.text()
+        resolvedFileName = `strava-route-${stravaRouteId}.gpx`
+      } else {
+        // ── RWGPS / direct .gpx or .tcx URL ──────────────────────────────────
+        const fetchUrl = resolveRouteUrl(url)
+        // AbortSignal.timeout is unreliable in Vercel Node.js — use explicit controller
+        const controller = new AbortController()
+        const timer = setTimeout(() => controller.abort(), 15_000)
+        let res: Response
+        try {
+          res = await fetch(fetchUrl, { signal: controller.signal })
+        } finally {
+          clearTimeout(timer)
+        }
+        if (!res!.ok) throw new Error(`Failed to fetch route URL: ${res!.status}`)
+        fileContent = await res!.text()
+        const trimmed = fileContent.trimStart()
+        if (trimmed.startsWith('<!') || trimmed.toLowerCase().startsWith('<html')) {
+          let htmlMsg = 'Route page requires login — export as GPX and upload the file instead.'
+          try {
+            if (new URL(fetchUrl).hostname.includes('ridewithgps.com')) {
+              htmlMsg = 'This Ride with GPS route may be private — export as GPX and upload the file instead.'
+            }
+          } catch { /* ignore */ }
+          throw new Error(htmlMsg)
+        }
+        const pathPart = new URL(fetchUrl).pathname.split('/').pop() ?? 'route.gpx'
+        resolvedFileName = /\.(gpx|tcx)$/i.test(pathPart) ? pathPart : `${pathPart}.gpx`
       }
-      if (!res!.ok) throw new Error(`Failed to fetch route URL: ${res!.status}`)
-      fileContent = await res!.text()
-      const trimmed = fileContent.trimStart()
-      if (trimmed.startsWith('<!') || trimmed.toLowerCase().startsWith('<html')) {
-        throw new Error('STRAVA_AUTH_REQUIRED')
-      }
-      const pathPart = new URL(url).pathname.split('/').pop() ?? 'route.gpx'
-      resolvedFileName = /\.(gpx|tcx)$/i.test(pathPart) ? pathPart : `${pathPart}.gpx`
     } else {
       const decoded = Buffer.from(file_data!, 'base64')
       if (decoded.byteLength > 15 * 1024 * 1024) {

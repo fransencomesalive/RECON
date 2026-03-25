@@ -199,6 +199,61 @@
   text-align: center;
 }
 
+/* ─── Platform detection messages ────────────────────────────────────────── */
+.platformInfo {
+  display: block;
+  font-family: var(--font-geist-sans, sans-serif);
+  font-size: 0.75rem;
+  color: #014a5a;
+  background: rgba(0, 170, 201, 0.12);
+  border-left: 3px solid #00aac9;
+  padding: 0.4rem 0.6rem;
+  border-radius: 2px;
+  line-height: 1.5;
+  width: 100%;
+  text-align: left;
+}
+
+.platformWarn {
+  display: block;
+  font-family: var(--font-geist-sans, sans-serif);
+  font-size: 0.75rem;
+  color: #7c3a10;
+  background: rgba(253, 182, 24, 0.18);
+  border-left: 3px solid var(--amber);
+  padding: 0.4rem 0.6rem;
+  border-radius: 2px;
+  line-height: 1.5;
+  width: 100%;
+  text-align: left;
+}
+
+.connectBtn {
+  display: block;
+  margin-top: 0.5rem;
+  background: #fc4c02;
+  color: #fff;
+  border: none;
+  border-radius: 2px;
+  font-family: var(--font-geist-mono, monospace);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 0.3rem 0.75rem;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.connectBtn:hover:not(:disabled) {
+  background: #e04000;
+}
+
+.connectBtn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
 /* ─── Divider ─────────────────────────────────────────────────────────────── */
 .divider {
   display: flex;

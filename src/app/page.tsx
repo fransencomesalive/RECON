@@ -46,9 +46,6 @@ function drawMesh(ctx: CanvasRenderingContext2D, nodes: MeshNode[], W: number, H
   })
 }
 
-// ─── URL detection ────────────────────────────────────────────────────────────
-
-
 // ─── URL validation ───────────────────────────────────────────────────────────
 
 function isValidUrl(url: string): boolean {
@@ -57,6 +54,32 @@ function isValidUrl(url: string): boolean {
     return u.protocol === 'http:' || u.protocol === 'https:'
   } catch {
     return false
+  }
+}
+
+// ─── Platform detection ───────────────────────────────────────────────────────
+
+type UrlPlatform =
+  | { type: 'rwgps'; exportUrl: string }
+  | { type: 'strava'; routeId: string }
+  | { type: 'direct' }
+
+function detectUrlPlatform(url: string): UrlPlatform | null {
+  if (!isValidUrl(url)) return null
+  try {
+    const u = new URL(url)
+    const host = u.hostname.replace(/^www\./, '')
+    if (host === 'ridewithgps.com') {
+      const m = u.pathname.match(/^\/(routes|trips)\/(\d+)(?:\.gpx)?$/)
+      if (m) return { type: 'rwgps', exportUrl: `https://ridewithgps.com/${m[1]}/${m[2]}.gpx` }
+    }
+    if (host === 'strava.com') {
+      const m = u.pathname.match(/\/routes\/(\d+)/)
+      if (m) return { type: 'strava', routeId: m[1] }
+    }
+    return { type: 'direct' }
+  } catch {
+    return null
   }
 }
 
@@ -92,6 +115,41 @@ export default function ReconPage() {
   const [dateWarning, setDateWarning] = useState(false)
 
   const router = useRouter()
+
+  const [stravaConnected, setStravaConnected] = useState(false)
+  const [stravaAvailable, setStravaAvailable] = useState(false)
+
+  const platform = url ? detectUrlPlatform(url) : null
+  const isAuthRequired = platform?.type === 'strava' && !stravaConnected
+
+  // ── Strava OAuth ──────────────────────────────────────────────────────────
+
+  useEffect(() => {
+    // Read connection state from cookie (set by callback route)
+    setStravaConnected(document.cookie.split(';').some(c => c.trim().startsWith('strava_connected=1')))
+
+    // Check if Strava OAuth is available for this IP
+    fetch('/api/auth/strava/available')
+      .then(r => r.json())
+      .then((d: { available: boolean }) => setStravaAvailable(d.available))
+      .catch(() => {})
+
+    // Restore the URL the user had pasted before being redirected to Strava
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('strava') === 'connected') {
+      const pending = sessionStorage.getItem('recon_pending_url')
+      if (pending) {
+        setUrl(pending)
+        sessionStorage.removeItem('recon_pending_url')
+      }
+      window.history.replaceState({}, '', '/')
+    }
+  }, [])
+
+  const handleConnectStrava = useCallback(() => {
+    if (url) sessionStorage.setItem('recon_pending_url', url)
+    window.location.href = '/api/auth/strava'
+  }, [url])
 
   // ── Orientation (mobile) ──────────────────────────────────────────────────
 
@@ -225,7 +283,7 @@ export default function ReconPage() {
   // ── Submit ────────────────────────────────────────────────────────────────
 
   const canSubmit = (selectedFile !== null && !fileError) ||
-                    (url !== '' && isValidUrl(url))
+                    (url !== '' && isValidUrl(url) && !isAuthRequired)
 
   const handleDateChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value
@@ -255,7 +313,8 @@ export default function ReconPage() {
       sessionStorage.setItem('recon_file_name', selectedFile.name)
       sessionStorage.removeItem('recon_route_url')
     } else if (url) {
-      sessionStorage.setItem('recon_route_url', url)
+      const effectiveUrl = platform?.type === 'rwgps' ? platform.exportUrl : url
+      sessionStorage.setItem('recon_route_url', effectiveUrl)
       sessionStorage.removeItem('recon_file_data')
       sessionStorage.removeItem('recon_file_name')
     }
@@ -330,13 +389,13 @@ export default function ReconPage() {
               styles.card,
               styles.cardUrl,
               url && !isValidUrl(url) ? styles.cardError  : '',
-              url &&  isValidUrl(url) ? styles.cardFilled : '',
+              url && isValidUrl(url) && !isAuthRequired ? styles.cardFilled : '',
             ].join(' ')}
           >
             <input
               type="text"
               className={styles.urlInput}
-              placeholder="Paste a direct link to a GPX or TCX file"
+              placeholder="Paste a route URL or direct link to a .gpx / .tcx file"
               value={url}
               onChange={handleUrlChange}
               onClick={(e) => e.stopPropagation()}
@@ -344,7 +403,35 @@ export default function ReconPage() {
             {url && !isValidUrl(url) && (
               <span className={styles.errorMsg}>{"Something's up with your URL. Double check it."}</span>
             )}
-            <span className={styles.comingSoon}>Strava · MapMyRide import coming in V2</span>
+            {!url && (
+              <span className={styles.comingSoon}>Only Ride with GPS links currently supported</span>
+            )}
+            {platform?.type === 'rwgps' && (
+              <span className={styles.platformInfo}>
+                Ride with GPS route detected — GPX will be fetched automatically.
+              </span>
+            )}
+            {platform?.type === 'strava' && stravaConnected && (
+              <span className={styles.platformInfo}>
+                Strava connected — route will be fetched automatically.
+              </span>
+            )}
+            {platform?.type === 'strava' && !stravaConnected && stravaAvailable && (
+              <span className={styles.platformWarn}>
+                Connect your Strava account to import this route directly.
+                <button className={styles.connectBtn} onClick={handleConnectStrava}>
+                  Connect Strava
+                </button>
+              </span>
+            )}
+            {platform?.type === 'strava' && !stravaConnected && !stravaAvailable && (
+              <span className={styles.platformWarn}>
+                Strava import is being tested and not yet open to the public.
+                <button className={styles.connectBtn} disabled>
+                  Connect Strava
+                </button>
+              </span>
+            )}
           </div>
 
           <div className={styles.dividerPlain} />
