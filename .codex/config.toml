@@ -1,0 +1,4 @@
+model = "codex-1"
+
+[projects."/Users/randallfransen/Sites/RECON"]
+trusted = true

@@ -1,0 +1,3 @@
+{
+  "notes": "Example local Claude settings for RECON. Copy to settings.local.json for machine-specific overrides. Do not commit secrets or credentials. Never read .env.local raw — use awk prefix/length inspection only."
+}
