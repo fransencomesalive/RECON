@@ -46,3 +46,4 @@ RECON_v1_*/
 RECON_v1_*.csv
 favicon.png
 .next/recon-dev-store
+*.swp
