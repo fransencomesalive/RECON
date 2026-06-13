@@ -8,7 +8,7 @@ RECON is a cycling route reconnaissance app. Users upload a GPX/TCX file or past
 **Dev**: `npm run dev` (port 3000 per package.json)
 
 ## Current priorities
-1. No active task — pipeline is stable as of 2026-03-25
+1. **NEXT: Add GitHub repo secrets to enable Cloudflare Worker auto-deploy** — wrangler.toml and workflow already committed (b11d0d8). Need to add `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` to GitHub → RECON repo → Settings → Security → Secrets and variables → Actions. Get API token from Cloudflare → My Profile → API Tokens → "Edit Cloudflare Workers" template. Account ID is in Cloudflare dashboard URL.
 2. Deferred: error message redesign (personality + plain language, in-place) — see docs/known-gotchas.md
 3. Deferred: Strava expanded API access (currently 1-athlete sandbox)
 4. Deferred: public lands entry/exit km (V2 — hardcoded to full route span currently)
