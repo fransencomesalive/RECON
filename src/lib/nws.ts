@@ -94,12 +94,19 @@ function periodToHourly(p: NwsForecastPeriod): HourlyPeriod {
 // ─── NWS fetch helper ─────────────────────────────────────────────────────────
 
 async function nwsFetch(url: string): Promise<Response> {
-  const res = await fetch(url, {
-    headers: { 'User-Agent': USER_AGENT, Accept: 'application/geo+json' },
-    signal: AbortSignal.timeout(3_000),
-  })
-  if (!res.ok) throw new Error(`NWS ${res.status}: ${url}`)
-  return res
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), 3_000)
+  let res: Response
+  try {
+    res = await fetch(url, {
+      headers: { 'User-Agent': USER_AGENT, Accept: 'application/geo+json' },
+      signal: controller.signal,
+    })
+  } finally {
+    clearTimeout(timer)
+  }
+  if (!res!.ok) throw new Error(`NWS ${res!.status}: ${url}`)
+  return res!
 }
 
 // ─── Naismith arrival time ─────────────────────────────────────────────────────
