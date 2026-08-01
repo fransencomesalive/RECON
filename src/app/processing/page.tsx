@@ -85,7 +85,7 @@ const SERVICES: { key: ServiceKey; label: string }[] = [
   { key: 'parse',    label: 'Parsing route file' },
   { key: 'osm',      label: 'Mapping terrain & infrastructure' },
   { key: 'weather',  label: 'Pulling weather forecast' },
-  { key: 'lands',    label: 'Querying land boundaries' },
+  { key: 'lands',    label: 'Assessing land access' },
   { key: 'coverage', label: 'Establishing mobile coverage strength' },
   { key: 'wind',     label: 'Building wind field' },
   { key: 'imagery',  label: 'Collecting route imagery' },

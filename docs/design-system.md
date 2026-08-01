@@ -17,7 +17,7 @@ Think expedition briefing, not dashboard SaaS.
   - Temperature: 9-stop °F scale defined in `tempToColor()` in `results/[id]/page.tsx` AND `RouteMap.tsx` — must stay in sync
   - Surface types: defined in overpass.ts and mapped in RouteMap.tsx
   - Coverage: good=#4caf50, fair=#fdb618, poor=#ed1c24, none=#888888
-  - Public lands: public=#14532d, state=#f9a825, private=#c62828, tribal=#7b5ea7
+  - Land ownership: federal=#14532d, state/territorial=#f9a825, local=#00aac9, tribal=#7b5ea7, nonprofit=#016a7d, private=#c62828, joint=#d48728, unverified=#888888
 
 ## Layout
 - Intake page: single card, centered, clean — form over visual complexity
@@ -46,6 +46,8 @@ Think expedition briefing, not dashboard SaaS.
 - Keep the `tempToColor` scale synchronized between results page and RouteMap
 - Use separate Mapbox layers per feature type (not `match` expressions on `line-pattern`)
 - Keep error states visually distinct and informative (error message redesign is deferred but planned)
+- Label mobile coverage as best available network until a carrier selector is added
+- Present land ownership and access separately; use unverified for gaps in source evidence
 
 ## Don't
 - Introduce Tailwind utility classes into component files — CSS Modules is the pattern

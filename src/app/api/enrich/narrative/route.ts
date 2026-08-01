@@ -65,8 +65,12 @@ async function generateNarrative(data: {
     : 'No weather data available.'
 
   const landSummary = data.lands
-    .map(l => `${l.name} (${l.agency})`)
-    .join(', ') || 'No federal land crossings identified.'
+    .map(l => {
+      const ownership = l.ownership ?? (l.status === 'public' ? 'federal' : l.status)
+      const access = l.access ?? 'unknown'
+      return `km ${l.entry_km}-${l.exit_km}: ${l.name} (${l.agency}), ownership ${ownership}, reported access ${access}`
+    })
+    .join('; ') || 'Land-access data unavailable.'
 
   const prompt = `You are a cycling route analyst. Write a concise 3–4 paragraph plain-language planning summary for a cyclist preparing for this route.
 
@@ -79,9 +83,9 @@ Surface breakdown: ${surfaceSummary || 'unknown'}
 Points of interest: ${poiSummary || 'none found'}
 Supply gaps: ${gapSummary || 'none'}
 Weather: ${weatherSummary}
-Land management: ${landSummary}
+Land access evidence: ${landSummary}
 
-Write from the perspective of an experienced route scout. Cover: terrain and surface character, weather considerations, resupply and water strategy, any bailout points or emergency access, and overall ride readiness. Be specific and actionable. Do not use bullet points or headers — flowing paragraphs only.`
+Write from the perspective of an experienced route scout. Cover: terrain and surface character, weather considerations, resupply and water strategy, land-access concerns, any bailout points or emergency access, and overall ride readiness. Treat restricted, closed, private, tribal, unknown, and unverified land segments as requiring the rider to verify permission or legal right-of-way. Never describe an unverified segment as private, public, legal, or illegal. Be specific and actionable. Do not use bullet points or headers. Use flowing paragraphs only.`
 
   const controller = new AbortController()
   const abortTimer = setTimeout(() => controller.abort(), 20_000)

@@ -134,6 +134,21 @@ export interface WeatherResult {
 
 export type LandStatus = 'public' | 'state' | 'private' | 'tribal' | 'unknown'
 
+export type LandOwnership =
+  | 'federal'
+  | 'state'
+  | 'local'
+  | 'tribal'
+  | 'nonprofit'
+  | 'private'
+  | 'joint'
+  | 'territorial'
+  | 'unknown'
+
+export type LandAccess = 'open' | 'restricted' | 'closed' | 'unknown' | 'unverified'
+
+export type LandEvidence = 'pad-us-fee' | 'unverified-gap'
+
 export interface LandCrossing {
   name: string
   agency: string
@@ -141,15 +156,33 @@ export interface LandCrossing {
   status: LandStatus
   entry_km: number
   exit_km: number
+  /** Ownership classification from the source dataset. Optional for legacy stored results. */
+  ownership?: LandOwnership
+  /** General recreation access evidence, not a legal right-of-way determination. */
+  access?: LandAccess
+  /** Source and vintage are retained so the UI can explain the classification. */
+  evidence?: LandEvidence
+  source_date?: string
+  access_source?: string
 }
 
 // ─── Cell Coverage ────────────────────────────────────────────────────────────
 
 export type CoverageConfidence = 'good' | 'fair' | 'poor' | 'none' | 'unknown'
 
+export interface CoverageNetwork {
+  network: string
+  network_slug: string
+  technology: '4G LTE' | '5G NR' | '3G' | string
+  rsrp_dbm?: number
+  signal_level: string
+}
+
 export interface CoverageSegment {
   distance_km: number
   confidence: CoverageConfidence
+  /** Per-network evidence from Broadband Map. Optional for legacy stored results. */
+  networks?: CoverageNetwork[]
 }
 
 // ─── Imagery ──────────────────────────────────────────────────────────────────

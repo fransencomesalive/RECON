@@ -617,7 +617,7 @@ ${trkpts}
 
         {/* ── Layer toggles — centered between map and elevation ── */}
         <div className={styles.layerToggles}>
-          {['Route', 'Surface', 'Weather', 'Public Lands', 'Mobile Coverage', 'POIs', 'Bailouts', 'Imagery'].map(layer => (
+          {['Route', 'Surface', 'Weather', 'Land Access', 'Mobile Coverage', 'POIs', 'Bailouts', 'Imagery'].map(layer => (
             <button
               key={layer}
               className={[styles.pill, activeLayers.has(layer) ? styles.pillActive : ''].join(' ')}
@@ -851,9 +851,9 @@ ${trkpts}
                   ))}
                 </div>
               </div>
-              {activeLayers.has('Public Lands') && result.lands.some(l => l.status && l.status !== 'unknown') && (
+              {activeLayers.has('Land Access') && result.lands.length > 0 && (
                 <div className={styles.legendRow}>
-                  <span className={styles.legendTitle}>Land</span>
+                  <span className={styles.legendTitle}>Ownership</span>
                   <span className={styles.legendItem}>
                     <svg width="28" height="10" style={{ verticalAlign: 'middle' }}><rect x="0" y="2" width="28" height="6" fill="#14532d" rx="2" /></svg> Federal
                   </span>
@@ -861,13 +861,45 @@ ${trkpts}
                     <svg width="28" height="10" style={{ verticalAlign: 'middle' }}><rect x="0" y="2" width="28" height="6" fill="#f9a825" rx="2" /></svg> State
                   </span>
                   <span className={styles.legendItem}>
+                    <svg width="28" height="10" style={{ verticalAlign: 'middle' }}><rect x="0" y="2" width="28" height="6" fill="#00aac9" rx="2" /></svg> Local
+                  </span>
+                  <span className={styles.legendItem}>
                     <svg width="28" height="10" style={{ verticalAlign: 'middle' }}><rect x="0" y="2" width="28" height="6" fill="#c62828" rx="2" /></svg> Private
                   </span>
-                  {result.lands.some(l => l.status === 'tribal') && (
+                  <span className={styles.legendItem}>
+                    <svg width="28" height="10" style={{ verticalAlign: 'middle' }}><rect x="0" y="2" width="28" height="6" fill="#7b5ea7" rx="2" /></svg> Tribal
+                  </span>
+                  {result.lands.some(land => land.ownership === 'nonprofit') && (
                     <span className={styles.legendItem}>
-                      <svg width="28" height="10" style={{ verticalAlign: 'middle' }}><rect x="0" y="2" width="28" height="6" fill="#7b5ea7" rx="2" /></svg> Tribal
+                      <svg width="28" height="10" style={{ verticalAlign: 'middle' }}><rect x="0" y="2" width="28" height="6" fill="#016a7d" rx="2" /></svg> Nonprofit
                     </span>
                   )}
+                  {result.lands.some(land => land.ownership === 'joint') && (
+                    <span className={styles.legendItem}>
+                      <svg width="28" height="10" style={{ verticalAlign: 'middle' }}><rect x="0" y="2" width="28" height="6" fill="#d48728" rx="2" /></svg> Joint
+                    </span>
+                  )}
+                  <span className={styles.legendItem}>
+                    <svg width="28" height="10" style={{ verticalAlign: 'middle' }}><rect x="0" y="2" width="28" height="6" fill="#888" rx="2" /></svg> Unknown / unverified
+                  </span>
+                </div>
+              )}
+              {activeLayers.has('Mobile Coverage') && result.coverage.some(s => s.confidence !== 'unknown') && (
+                <div className={styles.legendRow}>
+                  <span className={styles.legendTitle}>Coverage: best available network</span>
+                  {[
+                    { label: 'Good', color: '#4caf50' },
+                    { label: 'Fair', color: '#fdb618' },
+                    { label: 'Poor', color: '#ed1c24' },
+                    { label: 'None', color: '#888' },
+                  ].map(({ label, color }) => (
+                    <span key={label} className={styles.legendItem}>
+                      <svg width="28" height="10" style={{ verticalAlign: 'middle' }}><rect x="0" y="2" width="28" height="6" fill={color} rx="2" /></svg> {label}
+                    </span>
+                  ))}
+                  <span className={styles.legendItem}>
+                    <svg width="28" height="10" style={{ verticalAlign: 'middle' }}><line x1="0" y1="5" x2="28" y2="5" stroke="#888" strokeWidth="4" strokeDasharray="3 3" /></svg> Unknown gap
+                  </span>
                 </div>
               )}
               {activeLayers.has('Weather') && displayWeather.length > 0 && (
@@ -1112,27 +1144,46 @@ ${trkpts}
               </div>
             )}
 
-            {/* Land management — always last */}
+            {/* Land access evidence - always last */}
             {result.lands.length > 0 && (
               <div className={styles.card}>
-                <span className={styles.sectionTitle}>Land Management</span>
+                <span className={styles.sectionTitle}>Land Access</span>
+                <p className={styles.landCaveat}>
+                  Ownership and reported access are screening evidence, not proof of a legal route right-of-way. Verify permits, easements, and current closures locally.
+                </p>
                 {result.lands.map((land, i) => {
-                  const dotColor = land.status === 'public' ? '#14532d'
-                    : land.status === 'state'   ? '#f9a825'
-                    : land.status === 'private' ? '#c62828'
-                    : land.status === 'tribal'  ? '#7b5ea7'
-                    : '#888'
+                  const ownership = land.ownership ?? (
+                    land.status === 'public' ? 'federal' : land.status
+                  )
+                  const dotClass = ownership === 'federal' ? styles.landDotFederal
+                    : ownership === 'state'       ? styles.landDotState
+                    : ownership === 'local'       ? styles.landDotLocal
+                    : ownership === 'nonprofit'   ? styles.landDotNonprofit
+                    : ownership === 'private'     ? styles.landDotPrivate
+                    : ownership === 'tribal'      ? styles.landDotTribal
+                    : ownership === 'joint'       ? styles.landDotJoint
+                    : ownership === 'territorial' ? styles.landDotState
+                    : styles.landDotUnknown
+                  const accessLabel = land.access === 'open' ? 'Reported open; verify route right-of-way'
+                    : land.access === 'restricted' ? 'Reported restricted; verify permits, seasons, and route right-of-way'
+                    : land.access === 'closed' ? 'Reported closed; verify route right-of-way'
+                    : land.access === 'unverified' ? 'Ownership and access unverified'
+                    : 'Reported access unknown; verify route right-of-way'
+                  const distanceFactor = unit === 'imperial' ? 0.621371 : 1
+                  const entryDistance = land.entry_km * distanceFactor
+                  const exitDistance = land.exit_km * distanceFactor
+                  const intervalLength = exitDistance - entryDistance
+                  const distancePrecision = intervalLength < 0.01 ? 3 : intervalLength < 0.1 ? 2 : 1
                   return (
                     <div key={i} className={styles.landRow}>
-                      <span className={styles.landName} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: dotColor, flexShrink: 0 }} />
+                      <span className={styles.landNameLine}>
+                        <span className={[styles.landDot, dotClass].join(' ')} />
                         {land.name}
                       </span>
                       <span className={styles.landMeta}>
-                        {unit === 'imperial'
-                          ? `${(land.entry_km * 0.621371).toFixed(1)}–${(land.exit_km * 0.621371).toFixed(1)} mi`
-                          : `${land.entry_km.toFixed(1)}–${land.exit_km.toFixed(1)} km`}
-                        {' · '}{land.agency}
+                        {`${entryDistance.toFixed(distancePrecision)}–${exitDistance.toFixed(distancePrecision)} ${unit === 'imperial' ? 'mi' : 'km'}`}
+                        {' · '}{land.agency}{' · '}{accessLabel}
+                        {land.source_date ? ` · Source ${land.source_date}` : ''}
                       </span>
                     </div>
                   )
@@ -1174,8 +1225,8 @@ ${trkpts}
             {[
               { label: 'OpenStreetMap',     url: 'https://wiki.openstreetmap.org/wiki/Overpass_API' },
               { label: 'NWS Weather',       url: 'https://www.weather.gov/documentation/services-web-api' },
-              { label: 'PAD-US Public Lands', url: 'https://data.usgs.gov/datacatalog/data/USGS:652ef930d34edd15305a9b03' },
-              { label: 'FCC Coverage',      url: 'https://broadbandmap.fcc.gov/' },
+              { label: 'USGS PAD-US 4.1',   url: 'https://www.sciencebase.gov/catalog/item/652d4fc5d34e44db0e2ee45e' },
+              { label: 'Broadband Map',     url: 'https://broadbandmap.com/developers/' },
               { label: 'Mapillary',         url: 'https://www.mapillary.com/developer/api-documentation' },
             ].map(s => (
               <a key={s.label} href={s.url} target="_blank" rel="noopener noreferrer" className={styles.footerSourceLink}>
