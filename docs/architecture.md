@@ -10,8 +10,8 @@ Intake (page.tsx)
   → browser orchestrates parallel enrichments:
       POST /api/enrich/osm      (surfaces, POIs, supply gaps, bailouts)  maxDuration=60
       POST /api/enrich/weather  (NWS segments + alerts)                  maxDuration=20
-      POST /api/enrich/lands    (Esri PAD-US federal lands)              maxDuration=15
-      POST /api/enrich/coverage (broadbandmap.com FCC BDC)               maxDuration=30
+      POST /api/enrich/lands    (USGS PAD-US ownership + access)          maxDuration=15
+      POST /api/enrich/coverage (authenticated Broadband Map cell data)  maxDuration=30
       POST /api/enrich/wind     (Open-Meteo U/V grid)                    maxDuration=15
       POST /api/enrich/imagery  (Mapillary bbox queries)                  maxDuration=30
   → when osm + weather + lands done:
@@ -29,10 +29,11 @@ Intake (page.tsx)
 | `src/lib/parse-route.ts` | GPX/TCX → CanonicalRoute (togeojson + turf) |
 | `src/lib/overpass.ts` | OSM: segmented parallel queries, surfaces, POIs, bailouts |
 | `src/lib/nws.ts` | NWS weather segments + alerts |
-| `src/lib/lands.ts` | Esri PAD-US federal lands query |
+| `src/lib/lands.ts` | USGS PAD-US Fee Managers route intersections, ownership, and access evidence |
 | `src/lib/wind.ts` | Open-Meteo wind grid fetcher |
 | `src/lib/windParticles.ts` | WindParticleSystem — 1500-particle canvas animation |
-| `src/lib/coverage.ts` | broadbandmap.com FCC BDC API — batched, 5 concurrent |
+| `src/lib/coverage.ts` | Broadband Map cell API, authenticated and rate-bounded in batches of 5 |
+| `src/lib/route-geometry.ts` | Distance-aware route slicing for map evidence bands |
 | `src/lib/mapillary.ts` | Mapillary Graph API — bbox queries, quality-ranked |
 | `src/lib/store.ts` | Upstash Redis (prod) / filesystem dev storage |
 | `src/components/RouteMap.tsx` | Mapbox GL map, 7 toggleable layers + wind particle canvas |
@@ -91,7 +92,21 @@ KV_REST_API_URL               # Upstash (empty locally)
 KV_REST_API_TOKEN             # Upstash (empty locally)
 OVERPASS_PROXY_URL            # Cloudflare Worker URL
 MAPILLARY_ACCESS_TOKEN        # Imagery
+BROADBANDMAP_API_KEY          # Mobile coverage; server-side only
 STRAVA_CLIENT_ID              # Vercel only
 STRAVA_CLIENT_SECRET          # Vercel only
 NEXT_PUBLIC_BASE_URL          # https://recon.mettlecycling.com (Vercel only)
 ```
+
+## Land-access evidence model
+- PAD-US Fee Managers supplies federal, state, local, tribal, nonprofit, private protected, joint, territorial, and unknown ownership classifications.
+- `Pub_Access` is stored separately as open, restricted, closed, or unknown.
+- Geometry is fetched as GeoJSON so polygon holes are preserved. Route/boundary intersections produce exact, separate intervals for exits and re-entries.
+- The full route is partitioned into PAD-US-backed intervals and unverified gaps. A gap is never inferred to be private or public.
+- Ownership and PAD-US public-access codes are planning evidence only. Legal passage still depends on road/trail status, easements, permits, closures, and current local rules.
+
+## Mobile-coverage evidence model
+- `BROADBANDMAP_API_KEY` is sent server-side as a Bearer token and is never exposed to the browser.
+- Sample requests run five at a time with a 600 ms inter-batch delay to remain within the provider's 10 requests/second burst limit.
+- One bounded `Retry-After` retry is allowed for burst throttling. Credential and quota errors fail the enrichment immediately; isolated point failures remain unknown.
+- RECON stores carrier name/slug, radio technology, RSRP when present, and signal level for each sample. The current map displays the best available network and labels that limitation.

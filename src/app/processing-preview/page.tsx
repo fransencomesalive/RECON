@@ -70,7 +70,7 @@ const PREVIEW_SERVICES = [
   { label: 'Parsing route file',                    status: 'done'    },
   { label: 'Mapping terrain & infrastructure',      status: 'done'    },
   { label: 'Pulling weather forecast',              status: 'loading' },
-  { label: 'Querying land boundaries',              status: 'loading' },
+  { label: 'Assessing land access',                  status: 'loading' },
   { label: 'Establishing mobile coverage strength', status: 'pending' },
 ]
 

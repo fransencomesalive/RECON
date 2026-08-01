@@ -23,11 +23,17 @@
 
 - **Cloudflare Worker must be manually redeployed.** Code changes to `cloudflare-worker/overpass-proxy.js` do NOT auto-deploy via git push. Must redeploy through the Cloudflare dashboard.
 
-- **`maxAllowableOffset` collapses polygons.** Never use it in Esri PAD-US queries — collapses large polygons to degenerate single points.
+- **`maxAllowableOffset` collapses polygons.** Never use it in Esri PAD-US queries because it can collapse large polygons to degenerate single points.
 
-- **`resultRecordCount` with default OBJECTID ordering misses large polygons.** Use polyline query instead.
+- **PAD-US candidate discovery and geometry fetch are separate.** Query intersecting object IDs with overlapping full-route chunks, then fetch those IDs in bounded batches as GeoJSON. Do not use `resultRecordCount` with default ordering.
 
-- **`sample_points` (~5 km resolution) misses land crossings.** Must use full `route.geometry.coordinates` for point-in-polygon.
+- **`sample_points` (~5 km resolution) misses land crossings.** Use the full `route.geometry.coordinates` and segment/boundary intersections. Vertex-only point-in-polygon checks miss parcels crossed between vertices.
+
+- **PAD-US polygon topology matters.** GeoJSON interior rings must remain holes, and separate exits/re-entries must remain separate intervals. Do not flatten Esri rings or merge matches only by unit name.
+
+- **PAD-US absence means unverified, not private.** Fee Managers is not a nationwide private-parcel layer. Ownership also does not prove legal passage; check route rights-of-way, easements, permits, closures, and current tribal/local rules.
+
+- **Antimeridian routes are not supported by the PAD-US interval implementation.** Canonical route coordinates are assumed to be valid WGS84 and not cross ±180°.
 
 ## Mapbox GL v3
 
@@ -53,9 +59,11 @@
 
 ## Data / API shapes
 
-- **Esri PAD-US field name variants.** Handle: `unit_name`, `Unit_Name`, `UNIT_NM`; `Agency`, `Mang_Name`, `agbur`. Always check both cases.
+- **USGS Fee Managers codes are distinct dimensions.** `Own_Type` classifies ownership, while `Pub_Access` (`OA`, `RA`, `XA`, `UK`) is general public-access evidence. Never derive one from the other.
 
-- **broadbandmap.com response shape.** `{ coverage: CellRecord[], count: number }` — NOT a top-level array.
+- **Broadband Map requires authentication.** Send `BROADBANDMAP_API_KEY` as a server-side Bearer token. Missing, invalid, inactive, and quota-exhausted keys should fail the coverage enrichment rather than returning a false all-unknown success.
+
+- **Broadband Map response and rate limit.** The response is `{ coverage: CellRecord[], count: number }`, not a top-level array. Each record can include carrier, carrier slug, radio technology, RSRP, and signal level. Keep request starts within the documented 10/second burst limit and honor bounded `Retry-After` throttles.
 
 - **Open-Meteo**: free public API, no key. Wind grid: 3×3 (<20 km), 4×4 (20–80 km), 5×5 (>80 km) over expanded bbox (+0.5°).
 
@@ -65,10 +73,16 @@
 
 - **Rate limit whitelist IP.** Mac Studio is whitelisted at `76.155.104.209` (IPv4). If IP changes, update `whitelist` array in `src/app/api/analyze/route.ts`. Vercel always sees IPv4 even if `ifconfig.me` returns IPv6.
 
+## Dependency security
+
+- **Do not run `npm audit fix --force` without a full regression cycle.** As of 2026-08-01, the audit recommends Next.js 16.2.12 and Anthropic SDK 0.115.0; these are broader framework/SDK upgrades, not safe incidental fixes for an enrichment bug.
+
+- **Direct packages with advisories.** Next.js 16.1.7 and `@xmldom/xmldom` 0.8.11 have high-severity advisories. UUID 13.0.0 and the Anthropic SDK have moderate advisories. Review GPX/TCX parsing, App Router behavior, narrative generation, and the full production build after upgrading.
+
 ## Deferred work (not bugs, but important to know)
 
 - **Error message redesign**: raw technical strings are the current pattern — planned redesign to plain-language, in-place messages with error ID codes. Do not add new raw strings in the meantime; they'll need to be replaced.
 
 - **Wind particles**: deployed but untested in production. First live run may need tuning of `SPEED_SCALE`, `MAX_AGE`, opacity in `src/lib/windParticles.ts`.
 
-- **Public lands entry/exit km**: hardcoded to full route span. V2 needs proper point-in-polygon entry/exit detection.
+- **Private-parcel verification**: PAD-US-backed ownership/access is implemented, but nationwide private-parcel and right-of-way verification remains deferred. Unverified gaps are intentionally visible.

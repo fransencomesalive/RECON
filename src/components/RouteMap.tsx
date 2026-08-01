@@ -1,8 +1,9 @@
 'use client'
 
 import { useEffect, useRef } from 'react'
-import type { CoverageConfidence, ReconResult, SurfaceType, WeatherSegment } from '@/lib/types'
+import type { CoverageConfidence, LandOwnership, ReconResult, SurfaceType, WeatherSegment } from '@/lib/types'
 import { WindParticleSystem } from '@/lib/windParticles'
+import { sliceRouteByDistance } from '@/lib/route-geometry'
 
 // Mapbox is a large library — loaded dynamically to avoid SSR issues
 // and keep the initial bundle lean.
@@ -11,7 +12,7 @@ const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN ?? ''
 
 // ─── Layer visibility config ─────────────────────────────────────────────────
 
-export type MapLayer = 'Route' | 'Surface' | 'Weather' | 'Public Lands' | 'Mobile Coverage' | 'POIs' | 'Imagery'
+export type MapLayer = 'Route' | 'Surface' | 'Weather' | 'Land Access' | 'Mobile Coverage' | 'POIs' | 'Imagery'
 
 // ─── Color helpers ────────────────────────────────────────────────────────────
 
@@ -281,27 +282,36 @@ export default function RouteMap({ result, activeLayers, weatherSegments, startH
         }
         poiMarkersRef.current = poiMarkers
 
-        // ── Land status band ───────────────────────────────────────────────
-        const LAND_COLORS: Record<string, string> = {
-          public:  '#14532d',
-          state:   '#f9a825',
-          private: '#c62828',
-          tribal:  '#7b5ea7',
+        // ── Land ownership / access evidence band ─────────────────────────
+        const LAND_COLORS: Record<LandOwnership, string> = {
+          federal:    '#14532d',
+          state:      '#f9a825',
+          local:      '#00aac9',
+          tribal:     '#7b5ea7',
+          nonprofit:  '#016a7d',
+          private:    '#c62828',
+          joint:      '#d48728',
+          territorial:'#f9a825',
+          unknown:    '#888888',
         }
-        const visibleLands = result.lands.filter(l => l.status && l.status in LAND_COLORS)
-        if (visibleLands.length > 0) {
-          const landFeatures = visibleLands.map(land => {
-            const fromFrac = Math.min(land.entry_km / totalKm, 1)
-            const toFrac   = Math.min(land.exit_km  / totalKm, 1)
-            const fromIdx  = Math.floor(fromFrac * (coords2d.length - 1))
-            const toIdx    = Math.min(Math.ceil(toFrac * (coords2d.length - 1)), coords2d.length - 1)
-            return {
+        const legacyOwnership = (status: string): LandOwnership => {
+          if (status === 'state') return 'state'
+          if (status === 'private') return 'private'
+          if (status === 'tribal') return 'tribal'
+          if (status === 'public') return 'federal'
+          return 'unknown'
+        }
+        const landFeatures = result.lands.flatMap(land => {
+          const segmentCoords = sliceRouteByDistance(coords2d, land.entry_km, land.exit_km)
+          if (segmentCoords.length < 2) return []
+          const ownership = land.ownership ?? legacyOwnership(land.status)
+          return [{
               type: 'Feature' as const,
-              geometry: { type: 'LineString' as const, coordinates: coords2d.slice(fromIdx, toIdx + 1) },
-              properties: { color: LAND_COLORS[land.status] ?? '#888' },
-            }
-          })
-
+            geometry: { type: 'LineString' as const, coordinates: segmentCoords },
+            properties: { color: LAND_COLORS[ownership], ownership, access: land.access ?? 'unknown' },
+          }]
+        })
+        if (landFeatures.length > 0) {
           map.addSource('lands', {
             type: 'geojson',
             data: { type: 'FeatureCollection', features: landFeatures },
@@ -385,23 +395,21 @@ export default function RouteMap({ result, activeLayers, weatherSegments, startH
         // ── Mobile coverage halo ───────────────────────────────────────────
         // Wide, blurred line under the route showing coverage quality per segment.
         const coverageSegs = result.coverage ?? []
-        const visibleCovSegs = coverageSegs.filter(s => s.confidence !== 'unknown')
-        if (visibleCovSegs.length > 0) {
-          const coverageFeatures = visibleCovSegs.map((seg, i) => {
-            const fromFrac = seg.distance_km / totalKm
-            const toFrac   = i < visibleCovSegs.length - 1
-              ? visibleCovSegs[i + 1].distance_km / totalKm
-              : 1
-            const fromIdx  = Math.round(Math.min(fromFrac, 1) * (coords2d.length - 1))
-            const toIdx    = Math.min(Math.round(Math.min(toFrac, 1) * (coords2d.length - 1)), coords2d.length - 1)
-            const segCoords = coords2d.slice(fromIdx, Math.max(toIdx + 1, fromIdx + 2))
-            return {
+        const coverageFeatures = coverageSegs.flatMap((seg, i) => {
+          if (seg.confidence === 'unknown' || i >= coverageSegs.length - 1) return []
+          const segCoords = sliceRouteByDistance(
+            coords2d,
+            seg.distance_km,
+            coverageSegs[i + 1].distance_km,
+          )
+          if (segCoords.length < 2) return []
+          return [{
               type: 'Feature' as const,
-              geometry: { type: 'LineString' as const, coordinates: segCoords },
-              properties: { color: COVERAGE_COLOR[seg.confidence] },
-            }
-          })
-
+            geometry: { type: 'LineString' as const, coordinates: segCoords },
+            properties: { color: COVERAGE_COLOR[seg.confidence] },
+          }]
+        })
+        if (coverageFeatures.length > 0) {
           map.addSource('coverage', {
             type: 'geojson',
             data: { type: 'FeatureCollection', features: coverageFeatures },
@@ -492,7 +500,7 @@ export default function RouteMap({ result, activeLayers, weatherSegments, startH
           'Route':           ['route-line'],
           'Surface':         ['surface-line'],
           'Weather':         ['weather-line'],
-          'Public Lands':    ['lands-line'],
+          'Land Access':     ['lands-line'],
           'Mobile Coverage': ['coverage-halo'],
           'Bailouts':        ['bailout-line'],
         }
@@ -564,7 +572,7 @@ export default function RouteMap({ result, activeLayers, weatherSegments, startH
       'Route':           ['route-line'],
       'Surface':         ['surface-line'],
       'Weather':         ['weather-line'],
-      'Public Lands':    ['lands-line'],
+      'Land Access':     ['lands-line'],
       'Mobile Coverage': ['coverage-halo'],
       'Bailouts':        ['bailout-line'],
     }

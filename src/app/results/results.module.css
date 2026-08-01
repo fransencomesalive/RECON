@@ -482,14 +482,33 @@
   }
   .statTopRow {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 0.5rem;
   }
   .statTopRow .statCard {
     padding: 0.6rem 0.5rem;
+    min-width: 0;
+    box-sizing: border-box;
+  }
+  .statTopRow .statLabel {
+    overflow-wrap: anywhere;
   }
   .statTopRow .statValue {
     font-size: 0.82rem;
+  }
+}
+
+@media (max-width: 340px) {
+  .statTopRow .statCard {
+    padding-right: 0.3rem;
+    padding-left: 0.3rem;
+  }
+  .statTopRow .statLabel {
+    font-size: 0.7rem;
+    letter-spacing: 0.05em;
+  }
+  .statTopRow .statValue {
+    font-size: 0.75rem;
   }
 }
 
@@ -824,6 +843,13 @@
     left: auto;
     transform: none;
     margin: 1rem auto 0;
+    width: calc(100% - 32px);
+    box-sizing: border-box;
+  }
+  .notchRoute {
+    white-space: normal;
+    overflow-wrap: anywhere;
+    text-align: center;
   }
   .layout {
     padding-top: 1rem;
@@ -1030,7 +1056,15 @@
   font-style: italic;
 }
 
-/* ─── Land management ─────────────────────────────────────────────────────── */
+/* ─── Land access ─────────────────────────────────────────────────────────── */
+.landCaveat {
+  margin: 0.35rem 0 0.45rem;
+  font-family: var(--font-geist-sans, sans-serif);
+  font-size: 0.72rem;
+  line-height: 1.45;
+  color: #016a7d;
+}
+
 .landRow {
   display: flex;
   flex-direction: column;
@@ -1042,6 +1076,33 @@
 .landName   { font-family: var(--font-geist-sans, sans-serif); font-size: 0.82rem; font-weight: 600; color: #016a7d; }
 .landDetail { font-family: var(--font-geist-sans, sans-serif); font-size: 0.72rem; color: #016a7d; }
 .landMeta   { font-family: var(--font-geist-sans, sans-serif); font-size: 0.72rem; color: #016a7d; }
+
+.landNameLine {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-family: var(--font-geist-sans, sans-serif);
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #016a7d;
+}
+
+.landDot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.landDotFederal   { background: #14532d; }
+.landDotState     { background: #f9a825; }
+.landDotLocal     { background: #00aac9; }
+.landDotNonprofit { background: #016a7d; }
+.landDotPrivate   { background: #c62828; }
+.landDotTribal    { background: #7b5ea7; }
+.landDotJoint     { background: #d48728; }
+.landDotUnknown   { background: #888; }
 
 /* ─── Narrative ───────────────────────────────────────────────────────────── */
 .narrative {
